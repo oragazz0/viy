@@ -16,7 +16,7 @@
 
 Inspired by the creature from Slavic folklore whose gaze reveals absolute truth, Viy "opens its eyes" on your infrastructure — exposing hidden weaknesses through controlled chaos and omniscient observability.
 
-> *"What Viy sees, cannot hide."*
+> *"I summon the vampires! I summon the werewolves!... I summon Viy!"*
 
 ---
 
@@ -287,7 +287,7 @@ Viy says *"open your eyes to see what was always there."*
 Every experiment is a **revelation**. Every failure is a **truth** your infrastructure was hiding.
 The goal is not destruction — it is **understanding**.
 
-> *"Omniscient chaos, unveiled."*
+> *"A curse upon you! With the wings of a bat! With the blood of a serpent! I shall curse you! Curse you!"*
 
 ---
 
