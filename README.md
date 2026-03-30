@@ -1,5 +1,6 @@
 # 👁️ Viy
 
+```
 ══════════════════════════════════════════════════════════════
   ⬡       ⬡       ⬡
    ╲      │      ╱
@@ -7,8 +8,9 @@
     █░░╱ ▓▒◉▒▓ ╲░░█       V I Y
      ▀████████████▀
    ╱      │      ╲        Kubernetes Chaos Engineering Toolkit
-  ⬡       ⬡       ⬡       
+  ⬡       ⬡       ⬡
 ══════════════════════════════════════════════════════════════
+```
 
 **Viy** is a Kubernetes Chaos Engineering CLI toolkit written in Go.
 
