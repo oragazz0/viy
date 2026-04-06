@@ -9,9 +9,9 @@ import (
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/oragazz0/viy/internal/k8s"
 	"github.com/oragazz0/viy/internal/state"
 	"github.com/oragazz0/viy/pkg/eyes"
-	"github.com/oragazz0/viy/internal/k8s"
 	"github.com/oragazz0/viy/pkg/safety"
 )
 
@@ -148,8 +148,6 @@ func (o *Orchestrator) runDreamMode(pods []corev1.Pod, config RunConfig, maxAffe
 	fmt.Printf("Estimated blast radius: %d%% (%d/%d pods)\n",
 		config.BlastRadius, limit, len(pods))
 	fmt.Println("Safety checks: ✅ All passed")
-	fmt.Println()
-	fmt.Println("💡 Remove --dream flag to unveil for real.")
 
 	return nil
 }
