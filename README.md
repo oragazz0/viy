@@ -58,6 +58,24 @@ make build
 ./viy version
 ```
 
+### Environment Setup
+
+Viy needs access to a Kubernetes cluster. It resolves credentials in the following
+order:
+
+1. **Explicit kubeconfig** — pass the `--kubeconfig` flag to any command:
+
+   ```bash
+   viy unveil --kubeconfig /path/to/kubeconfig --eye disintegration ...
+   ```
+
+2. **In-cluster config** — when no `--kubeconfig` flag is provided, Viy assumes it
+   is running inside a Kubernetes pod and uses the service account token mounted at
+   `/var/run/secrets/kubernetes.io/serviceaccount`.
+
+> **Note:** Viy does **not** automatically read `$KUBECONFIG` or `~/.kube/config`.
+> You must pass the path explicitly via `--kubeconfig` when running outside a cluster.
+
 ### First Revelation (Dry-Run)
 
 Always dream before unveiling:
