@@ -63,18 +63,17 @@ make build
 Viy needs access to a Kubernetes cluster. It resolves credentials in the following
 order:
 
-1. **Explicit kubeconfig** — pass the `--kubeconfig` flag to any command:
+1. **`--kubeconfig` flag** — explicit path, highest priority:
 
    ```bash
    viy unveil --kubeconfig /path/to/kubeconfig --eye disintegration ...
    ```
 
-2. **In-cluster config** — when no `--kubeconfig` flag is provided, Viy assumes it
-   is running inside a Kubernetes pod and uses the service account token mounted at
-   `/var/run/secrets/kubernetes.io/serviceaccount`.
+2. **`$KUBECONFIG` / `~/.kube/config`** — when no flag is provided, Viy reads the
+   standard kubeconfig locations (`$KUBECONFIG` env var, then `~/.kube/config`).
 
-> **Note:** Viy does **not** automatically read `$KUBECONFIG` or `~/.kube/config`.
-> You must pass the path explicitly via `--kubeconfig` when running outside a cluster.
+3. **In-cluster config** — if no kubeconfig is found, Viy falls back to the service
+   account token mounted at `/var/run/secrets/kubernetes.io/serviceaccount`.
 
 ### First Revelation (Dry-Run)
 

@@ -61,5 +61,16 @@ func buildConfig(kubeconfig string) (*rest.Config, error) {
 		return clientcmd.BuildConfigFromFlags("", kubeconfig)
 	}
 
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		loadingRules,
+		&clientcmd.ConfigOverrides{},
+	)
+
+	config, err := clientConfig.ClientConfig()
+	if err == nil {
+		return config, nil
+	}
+
 	return rest.InClusterConfig()
 }
