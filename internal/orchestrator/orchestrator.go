@@ -58,6 +58,8 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 		return err
 	}
 
+	eye.Init(o.podManager, o.logger)
+
 	if err := eye.Validate(config.EyeConfig); err != nil {
 		return fmt.Errorf("validation failed: %w", err)
 	}

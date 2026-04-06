@@ -50,7 +50,9 @@ func makePods(names ...string) []corev1.Pod {
 
 func newTestEye(manager *mockPodManager) *Eye {
 	logger, _ := zap.NewDevelopment()
-	return NewEye(manager, logger)
+	eye := &Eye{}
+	eye.Init(manager, logger)
+	return eye
 }
 
 func testTarget() eyes.Target {

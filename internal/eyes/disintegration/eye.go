@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/oragazz0/viy/internal/k8s"
 	viyerrors "github.com/oragazz0/viy/pkg/errors"
 	"github.com/oragazz0/viy/pkg/eyes"
 )
@@ -23,7 +22,7 @@ func init() {
 
 // Eye reveals pod auto-recovery and orchestration health.
 type Eye struct {
-	podManager      k8s.PodManager
+	podManager      eyes.PodManager
 	logger          *zap.Logger
 	targetsAffected atomic.Int64
 	operationsTotal atomic.Int64
@@ -33,12 +32,9 @@ type Eye struct {
 	active          atomic.Bool
 }
 
-// NewEye creates a DisintegrationEye with dependencies.
-func NewEye(podManager k8s.PodManager, logger *zap.Logger) *Eye {
-	return &Eye{
-		podManager: podManager,
-		logger:     logger,
-	}
+func (e *Eye) Init(podManager eyes.PodManager, logger *zap.Logger) {
+	e.podManager = podManager
+	e.logger = logger
 }
 
 func (e *Eye) Name() string {

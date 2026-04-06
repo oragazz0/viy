@@ -98,8 +98,6 @@ Targets that would be unveiled:
 
 Estimated blast radius: 30% (3/10 pods)
 Safety checks: ✅ All passed
-
-💡 Remove --dream flag to unveil for real.
 ```
 
 ### Unveil for Real

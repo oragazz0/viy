@@ -3,12 +3,22 @@ package eyes
 import (
 	"context"
 	"time"
+
+	"go.uber.org/zap"
+	corev1 "k8s.io/api/core/v1"
 )
+
+// PodManager abstracts pod operations for eyes.
+type PodManager interface {
+	GetPods(ctx context.Context, namespace, selector string) ([]corev1.Pod, error)
+	DeletePod(ctx context.Context, namespace, name string, gracePeriod int64) error
+}
 
 // Eye represents a chaos module that reveals truths about infrastructure.
 type Eye interface {
 	Name() string
 	Description() string
+	Init(podManager PodManager, logger *zap.Logger)
 	Unveil(ctx context.Context, target Target, config EyeConfig) error
 	Pause(ctx context.Context) error
 	Close(ctx context.Context) error

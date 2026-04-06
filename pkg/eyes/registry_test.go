@@ -3,6 +3,8 @@ package eyes
 import (
 	"context"
 	"testing"
+
+	"go.uber.org/zap"
 )
 
 func TestRegister_And_Get(t *testing.T) {
@@ -89,6 +91,7 @@ type stubEye struct {
 
 func (s *stubEye) Name() string                                          { return s.name }
 func (s *stubEye) Description() string                                   { return "" }
+func (s *stubEye) Init(_ PodManager, _ *zap.Logger)                      {}
 func (s *stubEye) Unveil(_ context.Context, _ Target, _ EyeConfig) error { return nil }
 func (s *stubEye) Pause(_ context.Context) error                         { return nil }
 func (s *stubEye) Close(_ context.Context) error                         { return nil }
