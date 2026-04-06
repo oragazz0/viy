@@ -85,9 +85,9 @@ func TestRun_SuccessfulExperiment(t *testing.T) {
 			Selector:  "app=api",
 		},
 		EyeConfig:          &disintegration.Config{PodKillCount: 2, Strategy: "sequential"},
-		Duration:            1 * time.Minute,
-		BlastRadius:         50,
-		MinHealthyReplicas:  1,
+		Duration:           1 * time.Minute,
+		BlastRadius:        50,
+		MinHealthyReplicas: 1,
 	}
 
 	err := orch.Run(context.Background(), config)
@@ -173,9 +173,9 @@ func TestRun_BlastRadiusExceeded(t *testing.T) {
 			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
-		Duration:            1 * time.Minute,
-		BlastRadius:         50,
-		MinHealthyReplicas:  2,
+		Duration:           1 * time.Minute,
+		BlastRadius:        50,
+		MinHealthyReplicas: 2,
 	}
 
 	err := orch.Run(context.Background(), config)
@@ -200,10 +200,10 @@ func TestRun_DreamMode(t *testing.T) {
 			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
-		Duration:            1 * time.Minute,
-		BlastRadius:         50,
-		MinHealthyReplicas:  1,
-		DryRun:              true,
+		Duration:           1 * time.Minute,
+		BlastRadius:        50,
+		MinHealthyReplicas: 1,
+		DryRun:             true,
 	}
 
 	err := orch.Run(context.Background(), config)
@@ -232,9 +232,9 @@ func TestRun_PersistsExperimentState(t *testing.T) {
 			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
-		Duration:            1 * time.Minute,
-		BlastRadius:         50,
-		MinHealthyReplicas:  1,
+		Duration:           1 * time.Minute,
+		BlastRadius:        50,
+		MinHealthyReplicas: 1,
 	}
 
 	_ = orch.Run(context.Background(), config)
@@ -270,9 +270,9 @@ func TestRun_DeleteError_PersistsFailedState(t *testing.T) {
 			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
-		Duration:            1 * time.Minute,
-		BlastRadius:         50,
-		MinHealthyReplicas:  1,
+		Duration:           1 * time.Minute,
+		BlastRadius:        50,
+		MinHealthyReplicas: 1,
 	}
 
 	_ = orch.Run(context.Background(), config)

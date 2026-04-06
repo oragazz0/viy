@@ -12,12 +12,12 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 
-	"github.com/oragazz0/viy/internal/state"
-	"github.com/oragazz0/viy/pkg/eyes"
 	"github.com/oragazz0/viy/internal/eyes/disintegration"
 	"github.com/oragazz0/viy/internal/k8s"
 	"github.com/oragazz0/viy/internal/observability"
 	"github.com/oragazz0/viy/internal/orchestrator"
+	"github.com/oragazz0/viy/internal/state"
+	"github.com/oragazz0/viy/pkg/eyes"
 )
 
 var protectedNamespaces = map[string]bool{
