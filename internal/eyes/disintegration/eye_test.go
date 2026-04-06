@@ -196,3 +196,76 @@ func TestEye_Name(t *testing.T) {
 		t.Errorf("Name() = %q, want %q", eye.Name(), "disintegration")
 	}
 }
+
+func TestEye_Description(t *testing.T) {
+	eye := &Eye{}
+	if eye.Description() == "" {
+		t.Error("Description() should not be empty")
+	}
+}
+
+func TestEye_Validate_ValidConfig(t *testing.T) {
+	eye := &Eye{}
+	config := &Config{PodKillCount: 1, Strategy: "random"}
+
+	if err := eye.Validate(config); err != nil {
+		t.Errorf("Validate() error = %v", err)
+	}
+}
+
+func TestEye_Validate_InvalidConfig(t *testing.T) {
+	eye := &Eye{}
+	config := &Config{}
+
+	err := eye.Validate(config)
+	if err == nil {
+		t.Fatal("Validate() should fail with empty config")
+	}
+}
+
+func TestEye_Validate_WrongConfigType(t *testing.T) {
+	eye := &Eye{}
+
+	err := eye.Validate(wrongConfig{})
+	if err == nil {
+		t.Fatal("Validate() should fail with wrong config type")
+	}
+}
+
+func TestEye_Pause(t *testing.T) {
+	eye := &Eye{}
+	eye.active.Store(true)
+
+	if err := eye.Pause(context.Background()); err != nil {
+		t.Fatalf("Pause() error = %v", err)
+	}
+
+	if eye.active.Load() {
+		t.Error("Pause() should set active to false")
+	}
+}
+
+func TestEye_Close(t *testing.T) {
+	eye := &Eye{}
+	eye.active.Store(true)
+
+	if err := eye.Close(context.Background()); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	if eye.active.Load() {
+		t.Error("Close() should set active to false")
+	}
+}
+
+func TestEye_Unveil_InvalidConfigType(t *testing.T) {
+	eye := &Eye{}
+	err := eye.Unveil(context.Background(), testTarget(), wrongConfig{})
+	if err == nil {
+		t.Fatal("Unveil() should fail with wrong config type")
+	}
+}
+
+type wrongConfig struct{}
+
+func (wrongConfig) Validate() error { return nil }

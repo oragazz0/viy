@@ -53,6 +53,11 @@ func NewStore() (*Store, error) {
 	}, nil
 }
 
+// NewTestStore creates a Store with an explicit file path for testing.
+func NewTestStore(filePath string) *Store {
+	return &Store{filePath: filePath}
+}
+
 // Save writes the given experiments to disk.
 func (s *Store) Save(experiments []Experiment) error {
 	data, err := json.MarshalIndent(experiments, "", "  ")
