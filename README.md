@@ -292,6 +292,13 @@ go test -v ./internal/eyes/disintegration/...
 
 ---
 
+## Documentation
+
+<!-- Full documentation will be hosted at docs.viy.io -->
+For in-depth guides, configuration reference, architecture details, and runbooks, see the [`docs/`](docs/) folder.
+
+---
+
 ## Philosophy
 
 Viy is not just a chaos tool — it is a **truth revealer**.
