@@ -20,6 +20,28 @@ Configuration flows through two layers:
 | `--output` | string | `text` | Output format. Valid: `text`, `json`. Note: `json` is accepted but not yet implemented |
 | `--kubeconfig` | string | — | Explicit path to a kubeconfig file. See [Installation](../getting-started/installation.md#kubeconfig) for resolution order |
 
+## Target Selector
+
+The `--selector` flag accepts a comma-separated list of `key=value` label selectors:
+
+```bash
+--selector "version=v2"
+--selector "version=v2,tier=backend"
+```
+
+This selector is **merged** with the resource's own pod selector. For example, if a Deployment's selector is `app=api` and you pass `--selector "version=v2"`, the resulting query matches pods with both `app=api` and `version=v2`.
+
+The `--target` flag resolves the resource via the Kubernetes API and extracts its actual selector:
+
+| Target Kind | Selector Source |
+|---|---|
+| Deployment | `.spec.selector.matchLabels` |
+| StatefulSet | `.spec.selector.matchLabels` |
+| Service | `.spec.selector` |
+| Pod | Pod's own `.metadata.labels` |
+
+If the resource does not exist, Viy fails with `target not found` before any chaos runs.
+
 ## Blast Radius
 
 The `--blast-radius` flag accepts a percentage with or without the `%` suffix:
