@@ -12,6 +12,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/oragazz0/viy/internal/eyes/disintegration"
+	"github.com/oragazz0/viy/internal/k8s"
 	"github.com/oragazz0/viy/internal/state"
 	"github.com/oragazz0/viy/pkg/eyes"
 )
@@ -32,6 +33,15 @@ func (m *mockPodManager) DeletePod(_ context.Context, _, name string, _ int64) e
 	return m.deleteErr
 }
 
+type mockResolver struct {
+	resolved   *k8s.ResolvedTarget
+	resolveErr error
+}
+
+func (m *mockResolver) Resolve(_ context.Context, _ eyes.Target) (*k8s.ResolvedTarget, error) {
+	return m.resolved, m.resolveErr
+}
+
 func makePods(names ...string) []corev1.Pod {
 	pods := make([]corev1.Pod, len(names))
 	for index, name := range names {
@@ -46,6 +56,16 @@ func makePods(names ...string) []corev1.Pod {
 	return pods
 }
 
+func makeResolvedTarget(pods []corev1.Pod) *k8s.ResolvedTarget {
+	return &k8s.ResolvedTarget{
+		ResourceFound: true,
+		ResourceKind:  "deployment",
+		ResourceName:  "api",
+		Selector:      "app=api",
+		Pods:          pods,
+	}
+}
+
 func tempStore(t *testing.T) *state.Store {
 	t.Helper()
 
@@ -53,13 +73,13 @@ func tempStore(t *testing.T) *state.Store {
 	return state.NewTestStore(filepath.Join(directory, "state.json"))
 }
 
-func newTestOrchestrator(t *testing.T, manager *mockPodManager) *Orchestrator {
+func newTestOrchestrator(t *testing.T, manager *mockPodManager, resolver *mockResolver) *Orchestrator {
 	t.Helper()
 
 	logger, _ := zap.NewDevelopment()
 	store := tempStore(t)
 
-	return NewOrchestrator(manager, store, logger)
+	return NewOrchestrator(manager, resolver, store, logger)
 }
 
 func validConfig() *disintegration.Config {
@@ -70,11 +90,11 @@ func validConfig() *disintegration.Config {
 }
 
 func TestRun_SuccessfulExperiment(t *testing.T) {
-	manager := &mockPodManager{
-		pods: makePods("pod-a", "pod-b", "pod-c", "pod-d", "pod-e"),
-	}
+	pods := makePods("pod-a", "pod-b", "pod-c", "pod-d", "pod-e")
+	manager := &mockPodManager{pods: pods}
+	resolver := &mockResolver{resolved: makeResolvedTarget(pods)}
 
-	orch := newTestOrchestrator(t, manager)
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
@@ -82,7 +102,6 @@ func TestRun_SuccessfulExperiment(t *testing.T) {
 			Kind:      "Deployment",
 			Name:      "api",
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig:          &disintegration.Config{PodKillCount: 2, Strategy: "sequential"},
 		Duration:           1 * time.Minute,
@@ -102,7 +121,8 @@ func TestRun_SuccessfulExperiment(t *testing.T) {
 
 func TestRun_UnknownEye(t *testing.T) {
 	manager := &mockPodManager{}
-	orch := newTestOrchestrator(t, manager)
+	resolver := &mockResolver{}
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName:   "nonexistent",
@@ -118,13 +138,13 @@ func TestRun_UnknownEye(t *testing.T) {
 
 func TestRun_ValidationFailure(t *testing.T) {
 	manager := &mockPodManager{}
-	orch := newTestOrchestrator(t, manager)
+	resolver := &mockResolver{}
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
 		Target: eyes.Target{
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig: &disintegration.Config{}, // invalid: no kill count or percentage
 		Duration:  1 * time.Minute,
@@ -136,18 +156,20 @@ func TestRun_ValidationFailure(t *testing.T) {
 	}
 }
 
-func TestRun_GetPodsError(t *testing.T) {
-	manager := &mockPodManager{
-		getPodErr: errors.New("connection refused"),
+func TestRun_ResolveError(t *testing.T) {
+	manager := &mockPodManager{}
+	resolver := &mockResolver{
+		resolveErr: errors.New("deployment not found"),
 	}
 
-	orch := newTestOrchestrator(t, manager)
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
 		Target: eyes.Target{
+			Kind:      "Deployment",
+			Name:      "nonexistent",
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig: validConfig(),
 		Duration:  1 * time.Minute,
@@ -155,22 +177,23 @@ func TestRun_GetPodsError(t *testing.T) {
 
 	err := orch.Run(context.Background(), config)
 	if err == nil {
-		t.Fatal("Run() should propagate GetPods error")
+		t.Fatal("Run() should propagate resolver error")
 	}
 }
 
 func TestRun_BlastRadiusExceeded(t *testing.T) {
-	manager := &mockPodManager{
-		pods: makePods("pod-a", "pod-b"),
-	}
+	pods := makePods("pod-a", "pod-b")
+	manager := &mockPodManager{}
+	resolver := &mockResolver{resolved: makeResolvedTarget(pods)}
 
-	orch := newTestOrchestrator(t, manager)
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
 		Target: eyes.Target{
+			Kind:      "Deployment",
+			Name:      "api",
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
 		Duration:           1 * time.Minute,
@@ -185,11 +208,11 @@ func TestRun_BlastRadiusExceeded(t *testing.T) {
 }
 
 func TestRun_DreamMode(t *testing.T) {
-	manager := &mockPodManager{
-		pods: makePods("pod-a", "pod-b", "pod-c"),
-	}
+	pods := makePods("pod-a", "pod-b", "pod-c")
+	manager := &mockPodManager{}
+	resolver := &mockResolver{resolved: makeResolvedTarget(pods)}
 
-	orch := newTestOrchestrator(t, manager)
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
@@ -197,7 +220,6 @@ func TestRun_DreamMode(t *testing.T) {
 			Kind:      "Deployment",
 			Name:      "api",
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
 		Duration:           1 * time.Minute,
@@ -217,11 +239,11 @@ func TestRun_DreamMode(t *testing.T) {
 }
 
 func TestRun_PersistsExperimentState(t *testing.T) {
-	manager := &mockPodManager{
-		pods: makePods("pod-a", "pod-b", "pod-c"),
-	}
+	pods := makePods("pod-a", "pod-b", "pod-c")
+	manager := &mockPodManager{pods: pods}
+	resolver := &mockResolver{resolved: makeResolvedTarget(pods)}
 
-	orch := newTestOrchestrator(t, manager)
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
@@ -229,7 +251,6 @@ func TestRun_PersistsExperimentState(t *testing.T) {
 			Kind:      "Deployment",
 			Name:      "api",
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
 		Duration:           1 * time.Minute,
@@ -254,12 +275,14 @@ func TestRun_PersistsExperimentState(t *testing.T) {
 }
 
 func TestRun_DeleteError_PersistsFailedState(t *testing.T) {
+	pods := makePods("pod-a", "pod-b", "pod-c")
 	manager := &mockPodManager{
-		pods:      makePods("pod-a", "pod-b", "pod-c"),
+		pods:      pods,
 		deleteErr: errors.New("forbidden"),
 	}
+	resolver := &mockResolver{resolved: makeResolvedTarget(pods)}
 
-	orch := newTestOrchestrator(t, manager)
+	orch := newTestOrchestrator(t, manager, resolver)
 
 	config := RunConfig{
 		EyeName: "disintegration",
@@ -267,7 +290,6 @@ func TestRun_DeleteError_PersistsFailedState(t *testing.T) {
 			Kind:      "Deployment",
 			Name:      "api",
 			Namespace: "default",
-			Selector:  "app=api",
 		},
 		EyeConfig:          validConfig(),
 		Duration:           1 * time.Minute,

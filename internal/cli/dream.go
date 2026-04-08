@@ -12,6 +12,7 @@ func newDreamCommand() *cobra.Command {
 		eyeName     string
 		target      string
 		namespace   string
+		selector    string
 		blastRadius string
 		configStr   string
 		minHealthy  int
@@ -23,13 +24,14 @@ func newDreamCommand() *cobra.Command {
 		Long: color.MagentaString("🔮 ") +
 			"Viy dreams of chaos without executing. Shows what would happen.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runUnveil(eyeName, target, namespace, 0, blastRadius, configStr, true, minHealthy)
+			return runUnveil(eyeName, target, namespace, selector, 0, blastRadius, configStr, true, minHealthy)
 		},
 	}
 
 	command.Flags().StringVar(&eyeName, "eye", "", "Eye to open (required)")
 	command.Flags().StringVar(&target, "target", "", "Target resource (required)")
 	command.Flags().StringVar(&namespace, "namespace", "default", "Kubernetes namespace")
+	command.Flags().StringVar(&selector, "selector", "", "Label selector to filter pods, e.g. version=v2")
 	command.Flags().StringVar(&blastRadius, "blast-radius", "30%", "Max %% of targets to affect")
 	command.Flags().StringVar(&configStr, "config", "", "Eye-specific config (key=value pairs)")
 	command.Flags().IntVar(&minHealthy, "min-healthy", 1, "Minimum healthy replicas to preserve")

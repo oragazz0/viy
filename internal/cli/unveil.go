@@ -31,6 +31,7 @@ func newUnveilCommand() *cobra.Command {
 		eyeName     string
 		target      string
 		namespace   string
+		selector    string
 		duration    time.Duration
 		blastRadius string
 		configStr   string
@@ -44,13 +45,14 @@ func newUnveilCommand() *cobra.Command {
 		Long: color.MagentaString("🔮 ") +
 			"Unveil hidden weaknesses by opening an eye of Viy.",
 		RunE: func(_ *cobra.Command, _ []string) error {
-			return runUnveil(eyeName, target, namespace, duration, blastRadius, configStr, dream, minHealthy)
+			return runUnveil(eyeName, target, namespace, selector, duration, blastRadius, configStr, dream, minHealthy)
 		},
 	}
 
 	command.Flags().StringVar(&eyeName, "eye", "", "Eye to open (required)")
 	command.Flags().StringVar(&target, "target", "", "Target resource, e.g. deployment/nginx (required)")
 	command.Flags().StringVar(&namespace, "namespace", "default", "Kubernetes namespace")
+	command.Flags().StringVar(&selector, "selector", "", "Label selector to filter pods, e.g. version=v2")
 	command.Flags().DurationVar(&duration, "duration", 5*time.Minute, "Revelation duration")
 	command.Flags().StringVar(&blastRadius, "blast-radius", "30%", "Max %% of targets to affect")
 	command.Flags().StringVar(&configStr, "config", "", "Eye-specific config (key=value pairs)")
@@ -68,7 +70,7 @@ func newUnveilCommand() *cobra.Command {
 	return command
 }
 
-func runUnveil(eyeName, target, namespace string, duration time.Duration, blastRadius, configStr string, dream bool, minHealthy int) error {
+func runUnveil(eyeName, target, namespace, selector string, duration time.Duration, blastRadius, configStr string, dream bool, minHealthy int) error {
 	if protectedNamespaces[namespace] {
 		return fmt.Errorf("namespace %q is protected — chaos experiments are not allowed in system namespaces", namespace)
 	}
@@ -94,10 +96,9 @@ func runUnveil(eyeName, target, namespace string, duration time.Duration, blastR
 		return fmt.Errorf("invalid blast-radius: %w", err)
 	}
 
-	selector := parseSelectorFromTarget(target)
 	eyeConfig := buildDisintegrationConfig(configStr)
-
-	orch := orchestrator.NewOrchestrator(k8sClient, store, logger)
+	resolver := k8s.NewResolver(k8sClient)
+	orch := orchestrator.NewOrchestrator(k8sClient, resolver, store, logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -135,15 +136,6 @@ func parsePercentage(value string) (int, error) {
 	}
 
 	return parsed, nil
-}
-
-func parseSelectorFromTarget(target string) string {
-	parts := strings.SplitN(target, "/", 2)
-	if len(parts) == 2 {
-		return "app=" + parts[1]
-	}
-
-	return ""
 }
 
 func parseKindFromTarget(target string) string {

@@ -40,27 +40,6 @@ func TestParsePercentage(t *testing.T) {
 	}
 }
 
-func TestParseSelectorFromTarget(t *testing.T) {
-	tests := []struct {
-		name   string
-		target string
-		want   string
-	}{
-		{name: "deployment target", target: "deployment/nginx", want: "app=nginx"},
-		{name: "pod target", target: "pod/api-abc", want: "app=api-abc"},
-		{name: "bare name", target: "nginx", want: ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := parseSelectorFromTarget(tt.target)
-			if got != tt.want {
-				t.Errorf("parseSelectorFromTarget(%q) = %q, want %q", tt.target, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestParseKindFromTarget(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -297,7 +276,7 @@ func TestRunSlumber_AllExperiments(t *testing.T) {
 }
 
 func TestRunUnveil_ProtectedNamespace(t *testing.T) {
-	err := runUnveil("disintegration", "deployment/api", "kube-system", time.Minute, "30%", "", false, 1)
+	err := runUnveil("disintegration", "deployment/api", "kube-system", "", time.Minute, "30%", "", false, 1)
 	if err == nil {
 		t.Fatal("runUnveil() should fail for protected namespace")
 	}

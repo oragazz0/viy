@@ -13,6 +13,7 @@ var (
 	ErrEyesClosed              = errors.New("eyes are closed — no experiment running")
 	ErrInsufficientTargets     = errors.New("insufficient targets for requested kill count")
 	ErrExperimentNotFound      = errors.New("experiment not found")
+	ErrUnsupportedResourceKind = errors.New("unsupported resource kind")
 )
 
 // DetailedError wraps an error with actionable context.
