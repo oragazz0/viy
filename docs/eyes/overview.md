@@ -90,12 +90,13 @@ The `Dependencies` struct carries infrastructure dependencies available to eyes.
 
 ```go
 type Dependencies struct {
-    PodManager PodManager
-    Logger     *zap.Logger
+    PodManager                PodManager
+    EphemeralContainerManager EphemeralContainerManager
+    Logger                    *zap.Logger
 }
 ```
 
-Extend this struct when new eye types require additional infrastructure capabilities (e.g., `NetworkManager` for the Eye of Charm).
+Each eye uses only the subset it needs — `PodManager` for pod operations, `EphemeralContainerManager` for injecting sidecar processes (used by the Eye of Death). Extend this struct when new eye types require additional infrastructure capabilities (e.g., `NetworkManager` for the Eye of Charm).
 
 ### Registration and Lookup
 
@@ -137,8 +138,10 @@ This validates: non-empty Name/Description, Validate accepts/rejects configs, Ob
 | Eye | Status | Description |
 |---|---|---|
 | [Disintegration](disintegration.md) | Available | Pod termination — reveals auto-recovery and orchestration health |
+| [Death](death.md) | Available | Resource exhaustion — reveals resource limits, HPA scaling, and OOM killer behavior |
 
 ## See Also
 
 - [Eye of Disintegration](disintegration.md) — pod kill configuration and examples
+- [Eye of Death](death.md) — resource exhaustion configuration and examples
 - [Extending Viy](../architecture/extending.md) — how to write a new Eye

@@ -47,6 +47,7 @@ Packages under `pkg/` define contracts and shared types. They are safe to import
 | Package | Purpose |
 |---|---|
 | `pkg/eyes` | `Eye` interface, `Target`, `Metrics`, `EyeConfig`, registry |
+| `pkg/eyes/death` | Eye of Death — resource exhaustion via stress-ng ephemeral containers |
 | `pkg/safety` | `CalculateMaxAffected` — blast radius logic |
 | `pkg/errors` | Sentinel errors and `DetailedError` with suggestions |
 
@@ -82,6 +83,9 @@ internal/k8s (Resolver)      → pkg/eyes (Target type)
                              → pkg/errors
 
 internal/eyes/disintegration → pkg/eyes (implements interface)
+                             → pkg/errors
+
+pkg/eyes/death               → pkg/eyes (implements interface)
                              → pkg/errors
 ```
 

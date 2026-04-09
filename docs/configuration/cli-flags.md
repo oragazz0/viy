@@ -91,7 +91,21 @@ gracePeriod=0s
 
 See [Eye of Disintegration](../eyes/disintegration.md) for the full config reference.
 
+### Available Keys (Death)
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `cpuStress` | int (1-100) | `0` | CPU load percentage per worker |
+| `memoryStress` | int (1-100) | `0` | Memory consumption percentage per worker |
+| `diskIOBytes` | int64 | `0` | Bytes per worker for disk I/O stress |
+| `duration` | duration | — | How long stress-ng runs (required) |
+| `rampUp` | duration | `0s` | Gradual ramp-up period |
+| `workers` | int | — | Number of stress-ng worker threads (required) |
+
+At least one of `cpuStress`, `memoryStress`, or `diskIOBytes` must be set. See [Eye of Death](../eyes/death.md) for the full config reference.
+
 ## See Also
 
 - [CLI Commands](../cli/commands.md) — command-specific flags
 - [Eye of Disintegration](../eyes/disintegration.md) — config keys for the disintegration eye
+- [Eye of Death](../eyes/death.md) — config keys for the death eye

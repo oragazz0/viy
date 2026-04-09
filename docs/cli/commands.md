@@ -61,7 +61,7 @@ viy unveil --eye disintegration --target deployment/api-server --selector "versi
 ### Examples
 
 ```bash
-# Basic experiment
+# Basic experiment — pod termination
 viy unveil --eye disintegration --target deployment/nginx
 
 # Custom namespace and duration
@@ -79,6 +79,14 @@ viy unveil --eye disintegration --target deployment/api \
 # Tighter safety constraints
 viy unveil --eye disintegration --target deployment/nginx \
   --blast-radius 10% --min-healthy 5
+
+# Resource exhaustion — CPU and memory stress
+viy unveil --eye death --target deployment/api-server \
+  --config "cpuStress=80,memoryStress=70,workers=4,duration=2m"
+
+# Resource exhaustion with ramp-up and disk I/O
+viy unveil --eye death --target deployment/worker \
+  --config "cpuStress=80,memoryStress=70,diskIOBytes=1048576,duration=2m,rampUp=30s,workers=4"
 ```
 
 ### Signal Handling
@@ -222,4 +230,5 @@ Values default to `dev` / `none` / `unknown` when not injected via ldflags at bu
 
 - [CLI Flags](../configuration/cli-flags.md) — detailed flag reference and config format
 - [Eye of Disintegration](../eyes/disintegration.md) — config options for the disintegration eye
+- [Eye of Death](../eyes/death.md) — config options for the death eye (resource exhaustion)
 - [Safety Guards](../safety/guards.md) — how blast radius and min healthy work
