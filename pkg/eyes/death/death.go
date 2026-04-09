@@ -109,7 +109,7 @@ func (e *DeathEye) Unveil(ctx context.Context, target eyes.Target, config eyes.E
 	return nil
 }
 
-func (e *DeathEye) injectStressIntoPods(ctx context.Context, pods []corev1.Pod, namespace string, command []string) (injected int, failed int) {
+func (e *DeathEye) injectStressIntoPods(ctx context.Context, pods []corev1.Pod, namespace string, command []string) (injected, failed int) {
 	for _, pod := range pods {
 		if ctx.Err() != nil {
 			return injected, failed

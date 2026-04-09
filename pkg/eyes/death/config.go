@@ -10,7 +10,7 @@ import (
 const (
 	minStressPercent = 1
 	maxStressPercent = 100
-	minWorkers = 1
+	minWorkers       = 1
 )
 
 // Config holds resource exhaustion parameters for the Eye of Death.
