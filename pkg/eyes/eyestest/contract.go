@@ -103,8 +103,9 @@ func RunContractTests(t *testing.T, factory eyes.EyeFactory, validConfig, invali
 func makeDeps() eyes.Dependencies {
 	logger, _ := zap.NewDevelopment()
 	return eyes.Dependencies{
-		PodManager: &noopPodManager{},
-		Logger:     logger,
+		PodManager:                &noopPodManager{},
+		EphemeralContainerManager: &noopEphemeralContainerManager{},
+		Logger:                    logger,
 	}
 }
 
@@ -115,5 +116,15 @@ func (n *noopPodManager) GetPods(_ context.Context, _, _ string) ([]corev1.Pod, 
 }
 
 func (n *noopPodManager) DeletePod(_ context.Context, _, _ string, _ int64) error {
+	return nil
+}
+
+type noopEphemeralContainerManager struct{}
+
+func (n *noopEphemeralContainerManager) AddEphemeralContainer(_ context.Context, _, _ string, _ corev1.EphemeralContainer) error {
+	return nil
+}
+
+func (n *noopEphemeralContainerManager) ExecInContainer(_ context.Context, _, _, _ string, _ []string) error {
 	return nil
 }

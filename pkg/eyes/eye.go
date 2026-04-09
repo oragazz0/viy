@@ -24,12 +24,21 @@ type PodManager interface {
 	DeletePod(ctx context.Context, namespace, name string, gracePeriod int64) error
 }
 
+// EphemeralContainerManager abstracts ephemeral container injection into
+// running pods. Used by eyes that need to inject sidecar processes (e.g.
+// stress-ng for resource exhaustion).
+type EphemeralContainerManager interface {
+	AddEphemeralContainer(ctx context.Context, namespace, podName string, container corev1.EphemeralContainer) error
+	ExecInContainer(ctx context.Context, namespace, podName, containerName string, command []string) error
+}
+
 // Dependencies carries infrastructure dependencies available to eyes.
 // Each eye uses only the subset it needs. Extend this struct when new
 // eye types require additional infrastructure capabilities.
 type Dependencies struct {
-	PodManager PodManager
-	Logger     *zap.Logger
+	PodManager                PodManager
+	EphemeralContainerManager EphemeralContainerManager
+	Logger                    *zap.Logger
 }
 
 // Eye represents a chaos module that reveals truths about infrastructure.
