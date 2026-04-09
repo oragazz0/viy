@@ -24,7 +24,7 @@ import (
 // given factory. It verifies identity, validation, observation, pause,
 // and close behaviors. validConfig must pass Validate; invalidConfig
 // must fail it.
-func RunContractTests(t *testing.T, factory eyes.EyeFactory, validConfig eyes.EyeConfig, invalidConfig eyes.EyeConfig) {
+func RunContractTests(t *testing.T, factory eyes.EyeFactory, validConfig, invalidConfig eyes.EyeConfig) {
 	t.Helper()
 
 	deps := makeDeps()
