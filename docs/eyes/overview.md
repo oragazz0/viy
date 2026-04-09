@@ -14,24 +14,24 @@ Every Eye implements this contract (defined in `pkg/eyes/eye.go`):
 type Eye interface {
     Name() string
     Description() string
-    Init(podManager PodManager, logger *zap.Logger)
+    Validate(config EyeConfig) error
     Unveil(ctx context.Context, target Target, config EyeConfig) error
     Pause(ctx context.Context) error
     Close(ctx context.Context) error
     Observe() Metrics
-    Validate(config EyeConfig) error
 }
 ```
+
+Dependencies (pod manager, logger, etc.) are injected at construction time through the `Dependencies` struct — there is no separate `Init` step. See [Eye Registry](#eye-registry) below.
 
 ### Method Lifecycle
 
 | Method | When Called | Purpose |
 |---|---|---|
-| `Init` | Before experiment starts | Inject dependencies (pod manager, logger) |
 | `Validate` | Before execution | Verify configuration is valid |
 | `Unveil` | Experiment start | Execute the chaos injection |
 | `Pause` | Manual pause request | Temporarily halt the eye |
-| `Close` | Experiment end | Stop and clean up |
+| `Close` | Experiment end | Stop and clean up (eye must not be reused) |
 | `Observe` | Any time | Return current metrics snapshot |
 
 ## Supporting Types
@@ -68,6 +68,7 @@ In-memory metrics tracked during an experiment:
 
 ```go
 type Metrics struct {
+    EyeName           string    // Identifies which eye produced these metrics
     TargetsAffected   int       // Number of resources affected
     OperationsTotal   int64     // Total K8s API calls made
     ErrorsTotal       int64     // Errors encountered
@@ -77,26 +78,59 @@ type Metrics struct {
 }
 ```
 
+The `EyeName` field allows multi-eye experiments to attribute metrics to the correct eye.
+
 ## Eye Registry
 
-Eyes self-register at import time using Go's `init()` function. The registry lives in `pkg/eyes/registry.go`:
+Eyes self-register at import time using Go's `init()` function. The registry lives in `pkg/eyes/registry.go`.
+
+### Dependencies
+
+The `Dependencies` struct carries infrastructure dependencies available to eyes. Each eye uses only the subset it needs:
+
+```go
+type Dependencies struct {
+    PodManager PodManager
+    Logger     *zap.Logger
+}
+```
+
+Extend this struct when new eye types require additional infrastructure capabilities (e.g., `NetworkManager` for the Eye of Charm).
+
+### Registration and Lookup
 
 ```go
 // Registration (in the eye's package)
 func init() {
-    eyes.Register("disintegration", func() eyes.Eye {
-        return &Eye{}
+    eyes.Register("disintegration", func(deps eyes.Dependencies) eyes.Eye {
+        return &Eye{
+            podManager: deps.PodManager,
+            logger:     deps.Logger,
+        }
     })
 }
 
-// Lookup
-eye, err := eyes.Get("disintegration")
+// Lookup — creates the eye with dependencies in one step
+eye, err := eyes.Get("disintegration", deps)
 
-// List all registered eyes
-names := eyes.List() // returns sorted []string
+// Discovery
+names := eyes.List()              // returns sorted []string
+exists := eyes.Exists("charm")    // check without instantiating
 ```
 
 The registry panics on duplicate names — each eye must have a unique identifier.
+
+### Contract Tests
+
+The `pkg/eyes/eyestest` package provides reusable contract tests that any eye implementation must pass:
+
+```go
+func TestContract(t *testing.T) {
+    eyestest.RunContractTests(t, myFactory, validConfig, invalidConfig)
+}
+```
+
+This validates: non-empty Name/Description, Validate accepts/rejects configs, Observe returns the correct EyeName, inactive by default, and Pause/Close behavior.
 
 ## Available Eyes
 

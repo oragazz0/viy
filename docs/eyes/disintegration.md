@@ -91,6 +91,7 @@ During and after execution, `Observe()` returns:
 
 | Metric | Description |
 |---|---|
+| `EyeName` | Always `"disintegration"` |
 | `TargetsAffected` | Number of pods successfully deleted |
 | `OperationsTotal` | Total delete API calls made |
 | `ErrorsTotal` | Delete operations that failed |

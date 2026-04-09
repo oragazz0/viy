@@ -54,12 +54,13 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 		zap.Bool("dry_run", config.DryRun),
 	)
 
-	eye, err := eyes.Get(config.EyeName)
+	eye, err := eyes.Get(config.EyeName, eyes.Dependencies{
+		PodManager: o.podManager,
+		Logger:     o.logger,
+	})
 	if err != nil {
 		return err
 	}
-
-	eye.Init(o.podManager, o.logger)
 
 	if err := eye.Validate(config.EyeConfig); err != nil {
 		return fmt.Errorf("validation failed: %w", err)

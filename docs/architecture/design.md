@@ -85,7 +85,7 @@ internal/eyes/disintegration → pkg/eyes (implements interface)
                              → pkg/errors
 ```
 
-The orchestrator depends on `pkg/eyes.Eye` (the interface) and `internal/k8s.TargetResolver` (the interface), not on any specific implementation. Eyes only see `PodManager` — they are not aware of target resolution. The `TargetResolver` handles fetching the K8s resource, extracting its selector, and resolving pods.
+The orchestrator depends on `pkg/eyes.Eye` (the interface) and `internal/k8s.TargetResolver` (the interface), not on any specific implementation. Eyes receive their dependencies (e.g., `PodManager`, logger) at construction time via `eyes.Dependencies` — the orchestrator passes this to `eyes.Get()` and the factory injects what each eye needs. Eyes are not aware of target resolution; the `TargetResolver` handles fetching the K8s resource, extracting its selector, and resolving pods.
 
 ## Key Design Decisions
 
