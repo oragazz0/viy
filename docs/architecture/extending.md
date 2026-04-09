@@ -4,11 +4,12 @@
 
 ## Overview
 
-Adding a new Eye requires three steps:
+Adding a new Eye requires four steps:
 
-1. Implement the `Eye` interface
-2. Define a config struct implementing `EyeConfig`
+1. Define a config struct implementing `EyeConfig`
+2. Implement the `Eye` interface with dependency injection via factory
 3. Register via `init()`
+4. Wire up contract tests
 
 The existing Eye of Disintegration (`internal/eyes/disintegration/`) serves as the reference implementation.
 
@@ -54,7 +55,7 @@ func (c *Config) Validate() error {
 
 ## Step 3: Implement the Eye
 
-Create `eye.go` implementing the `eyes.Eye` interface:
+Create `eye.go` implementing the `eyes.Eye` interface. Dependencies are injected at construction time through the factory — there is no `Init` method:
 
 ```go
 package youreyename
@@ -71,10 +72,14 @@ import (
     "github.com/oragazz0/viy/pkg/eyes"
 )
 
-// Register the eye at import time.
+// Register the eye at import time. The factory receives Dependencies
+// and stores what this eye needs.
 func init() {
-    eyes.Register("youreyename", func() eyes.Eye {
-        return &Eye{}
+    eyes.Register("youreyename", func(deps eyes.Dependencies) eyes.Eye {
+        return &Eye{
+            podManager: deps.PodManager,
+            logger:     deps.Logger,
+        }
     })
 }
 
@@ -91,11 +96,6 @@ type Eye struct {
 
 func (e *Eye) Name() string        { return "youreyename" }
 func (e *Eye) Description() string { return "Reveals something about your infrastructure" }
-
-func (e *Eye) Init(podManager eyes.PodManager, logger *zap.Logger) {
-    e.podManager = podManager
-    e.logger = logger
-}
 
 func (e *Eye) Validate(config eyes.EyeConfig) error {
     cfg, ok := config.(*Config)
@@ -133,6 +133,7 @@ func (e *Eye) Close(_ context.Context) error {
 
 func (e *Eye) Observe() eyes.Metrics {
     return eyes.Metrics{
+        EyeName:           e.Name(),
         TargetsAffected:   int(e.targetsAffected.Load()),
         OperationsTotal:   e.operationsTotal.Load(),
         ErrorsTotal:       e.errorsTotal.Load(),
@@ -149,18 +150,52 @@ The eye registers itself via `init()`, but the package must be imported somewher
 
 In `internal/cli/unveil.go`, the disintegration eye is imported directly because the CLI builds its config. Follow the same pattern — add your import and a `buildYourEyeConfig()` function.
 
-## Step 5: Add CLI Config Parsing
+## Step 5: Wire Contract Tests
+
+Add a contract test to `eye_test.go` to verify your eye satisfies the interface contract. The `pkg/eyes/eyestest` package provides a reusable test suite:
+
+```go
+package youreyename
+
+import (
+    "testing"
+
+    "github.com/oragazz0/viy/pkg/eyes"
+    "github.com/oragazz0/viy/pkg/eyes/eyestest"
+)
+
+func TestContract(t *testing.T) {
+    factory := func(deps eyes.Dependencies) eyes.Eye {
+        return &Eye{
+            podManager: deps.PodManager,
+            logger:     deps.Logger,
+        }
+    }
+
+    validConfig := &Config{SomeParameter: 1}
+    invalidConfig := &Config{}
+
+    eyestest.RunContractTests(t, factory, validConfig, invalidConfig)
+}
+```
+
+This validates: non-empty Name/Description, Validate accepts/rejects configs, Observe returns the correct EyeName, inactive by default, and Pause/Close behavior. Any future changes to the `Eye` interface contract will be caught here.
+
+## Step 6: Add CLI Config Parsing
 
 In `internal/cli/unveil.go`, add a config builder for your eye's `--config` key=value parsing, following the pattern of `buildDisintegrationConfig()`.
 
 ## Checklist
 
 - [ ] Config struct implements `eyes.EyeConfig` with `Validate()`
-- [ ] Eye struct implements all 8 methods of `eyes.Eye`
+- [ ] Eye struct implements all 7 methods of `eyes.Eye`
+- [ ] Factory receives `eyes.Dependencies` and stores needed deps
 - [ ] `init()` calls `eyes.Register()` with a unique name
+- [ ] `Observe()` returns `EyeName` matching `Name()`
 - [ ] `Unveil()` respects context cancellation
 - [ ] Metrics are updated atomically
 - [ ] Errors use sentinel types from `pkg/errors`
+- [ ] Contract tests pass via `eyestest.RunContractTests()`
 - [ ] Tests cover: success path, error paths, config validation, context cancellation
 - [ ] CLI config builder parses `--config` key=value pairs
 
