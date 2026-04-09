@@ -35,15 +35,49 @@ jobs:
           go-version-file: go.mod
 
       - name: Run tests
-        run: go test -v -race -count=1 -coverprofile=coverage.out ./...
+        run: |
+          set -o pipefail
+          go test -v -race -count=1 -coverprofile=coverage.out ./... 2>&1 | tee test-output.txt
+
+      - name: Annotate test failures
+        if: failure()
+        run: |
+          echo "### Failed tests:"
+          grep -E "^--- FAIL:" test-output.txt | while read line; do
+            test_name=$(echo "$line" | awk '{print $3}')
+            echo "::error::${test_name} failed"
+            echo "  ✗ ${test_name}"
+          done
+          echo ""
+          echo "### FAIL output:"
+          grep -B5 "^--- FAIL:" test-output.txt
 
       - name: Check coverage threshold
         run: |
-          total=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $NF}' | tr -d '%')
-          echo "Total coverage: ${total}%"
           threshold=80
+          echo "## Per-package coverage"
+          echo ""
+          go tool cover -func=coverage.out | grep -E '^[a-z]' | awk '{print $1, $NF}' | while read pkg pct; do
+            num=$(echo "$pct" | tr -d '%')
+            if [ "$(echo "${num} < ${threshold}" | bc -l)" -eq 1 ]; then
+              echo "::warning file=${pkg}::${pkg} coverage is ${pct} (below ${threshold}%)"
+              echo "  ⚠ ${pkg} ${pct}"
+            else
+              echo "  ✓ ${pkg} ${pct}"
+            fi
+          done
+          echo ""
+          total=$(go tool cover -func=coverage.out | grep '^total:' | awk '{print $NF}' | tr -d '%')
+          echo "## Total coverage: ${total}%"
+          echo ""
+          echo "### Functions below ${threshold}%"
+          go tool cover -func=coverage.out | awk -v t="${threshold}" '{
+            pct = $NF; gsub(/%/, "", pct);
+            if (pct+0 < t+0 && $1 !~ /^total:/) print "  " $1 ":" $2 " " $(NF-1) " " $NF
+          }'
+          echo ""
           if [ "$(echo "${total} < ${threshold}" | bc -l)" -eq 1 ]; then
-            echo "::error::Coverage ${total}% is below ${threshold}% threshold"
+            echo "::error::Total coverage ${total}% is below ${threshold}% threshold"
             exit 1
           fi
 
