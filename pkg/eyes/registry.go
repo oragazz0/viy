@@ -6,8 +6,9 @@ import (
 	"sync"
 )
 
-// EyeFactory creates a new instance of an Eye.
-type EyeFactory func() Eye
+// EyeFactory creates a new Eye instance with the given dependencies.
+// Registered via [Register] during init() and invoked by [Get].
+type EyeFactory func(deps Dependencies) Eye
 
 var (
 	registryMu sync.RWMutex
@@ -15,7 +16,8 @@ var (
 )
 
 // Register adds an eye factory to the global registry.
-// Panics if the name is already registered.
+// Panics if the name is already registered. Intended to be called
+// from init() in each eye package.
 func Register(name string, factory EyeFactory) {
 	registryMu.Lock()
 	defer registryMu.Unlock()
@@ -27,8 +29,9 @@ func Register(name string, factory EyeFactory) {
 	registry[name] = factory
 }
 
-// Get returns a new Eye instance by name.
-func Get(name string) (Eye, error) {
+// Get creates a new Eye instance by name, injecting the given dependencies.
+// Returns an error if the eye name is not registered.
+func Get(name string, deps Dependencies) (Eye, error) {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
 
@@ -37,7 +40,16 @@ func Get(name string) (Eye, error) {
 		return nil, fmt.Errorf("unknown eye: %q", name)
 	}
 
-	return factory(), nil
+	return factory(deps), nil
+}
+
+// Exists reports whether an eye with the given name is registered.
+func Exists(name string) bool {
+	registryMu.RLock()
+	defer registryMu.RUnlock()
+
+	_, exists := registry[name]
+	return exists
 }
 
 // List returns all registered eye names in sorted order.

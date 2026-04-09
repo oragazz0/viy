@@ -3,20 +3,17 @@ package eyes
 import (
 	"context"
 	"testing"
-
-	"go.uber.org/zap"
 )
 
 func TestRegister_And_Get(t *testing.T) {
-	// Reset registry for isolated test
 	cleanup := isolateRegistry()
 	defer cleanup()
 
-	Register("test-eye", func() Eye {
+	Register("test-eye", func(_ Dependencies) Eye {
 		return &stubEye{name: "test-eye"}
 	})
 
-	eye, err := Get("test-eye")
+	eye, err := Get("test-eye", Dependencies{})
 	if err != nil {
 		t.Fatalf("Get returned error: %v", err)
 	}
@@ -30,7 +27,7 @@ func TestGet_UnknownEye(t *testing.T) {
 	cleanup := isolateRegistry()
 	defer cleanup()
 
-	_, err := Get("nonexistent")
+	_, err := Get("nonexistent", Dependencies{})
 	if err == nil {
 		t.Fatal("Get should return error for unknown eye")
 	}
@@ -40,7 +37,7 @@ func TestRegister_Duplicate_Panics(t *testing.T) {
 	cleanup := isolateRegistry()
 	defer cleanup()
 
-	Register("dup", func() Eye { return &stubEye{} })
+	Register("dup", func(_ Dependencies) Eye { return &stubEye{} })
 
 	defer func() {
 		if r := recover(); r == nil {
@@ -48,16 +45,16 @@ func TestRegister_Duplicate_Panics(t *testing.T) {
 		}
 	}()
 
-	Register("dup", func() Eye { return &stubEye{} })
+	Register("dup", func(_ Dependencies) Eye { return &stubEye{} })
 }
 
 func TestList(t *testing.T) {
 	cleanup := isolateRegistry()
 	defer cleanup()
 
-	Register("charlie", func() Eye { return &stubEye{} })
-	Register("alpha", func() Eye { return &stubEye{} })
-	Register("bravo", func() Eye { return &stubEye{} })
+	Register("charlie", func(_ Dependencies) Eye { return &stubEye{} })
+	Register("alpha", func(_ Dependencies) Eye { return &stubEye{} })
+	Register("bravo", func(_ Dependencies) Eye { return &stubEye{} })
 
 	names := List()
 	if len(names) != 3 {
@@ -66,6 +63,21 @@ func TestList(t *testing.T) {
 
 	if names[0] != "alpha" || names[1] != "bravo" || names[2] != "charlie" {
 		t.Errorf("List() = %v, want sorted [alpha bravo charlie]", names)
+	}
+}
+
+func TestExists(t *testing.T) {
+	cleanup := isolateRegistry()
+	defer cleanup()
+
+	Register("present", func(_ Dependencies) Eye { return &stubEye{} })
+
+	if !Exists("present") {
+		t.Error("Exists() should return true for registered eye")
+	}
+
+	if Exists("absent") {
+		t.Error("Exists() should return false for unregistered eye")
 	}
 }
 
@@ -91,7 +103,6 @@ type stubEye struct {
 
 func (s *stubEye) Name() string                                          { return s.name }
 func (s *stubEye) Description() string                                   { return "" }
-func (s *stubEye) Init(_ PodManager, _ *zap.Logger)                      {}
 func (s *stubEye) Unveil(_ context.Context, _ Target, _ EyeConfig) error { return nil }
 func (s *stubEye) Pause(_ context.Context) error                         { return nil }
 func (s *stubEye) Close(_ context.Context) error                         { return nil }

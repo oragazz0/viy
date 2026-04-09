@@ -15,12 +15,16 @@ import (
 )
 
 func init() {
-	eyes.Register("disintegration", func() eyes.Eye {
-		return &Eye{}
+	eyes.Register("disintegration", func(deps eyes.Dependencies) eyes.Eye {
+		return &Eye{
+			podManager: deps.PodManager,
+			logger:     deps.Logger,
+		}
 	})
 }
 
-// Eye reveals pod auto-recovery and orchestration health.
+// Eye reveals pod auto-recovery and orchestration health
+// by terminating pods and observing the cluster's response.
 type Eye struct {
 	podManager      eyes.PodManager
 	logger          *zap.Logger
@@ -30,11 +34,6 @@ type Eye struct {
 	truthsRevealed  []string
 	lastExecution   atomic.Int64
 	active          atomic.Bool
-}
-
-func (e *Eye) Init(podManager eyes.PodManager, logger *zap.Logger) {
-	e.podManager = podManager
-	e.logger = logger
 }
 
 func (e *Eye) Name() string {
@@ -130,6 +129,7 @@ func (e *Eye) Close(_ context.Context) error {
 
 func (e *Eye) Observe() eyes.Metrics {
 	return eyes.Metrics{
+		EyeName:           e.Name(),
 		TargetsAffected:   int(e.targetsAffected.Load()),
 		OperationsTotal:   e.operationsTotal.Load(),
 		ErrorsTotal:       e.errorsTotal.Load(),

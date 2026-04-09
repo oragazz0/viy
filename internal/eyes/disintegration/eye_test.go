@@ -12,6 +12,7 @@ import (
 
 	viyerrors "github.com/oragazz0/viy/pkg/errors"
 	"github.com/oragazz0/viy/pkg/eyes"
+	"github.com/oragazz0/viy/pkg/eyes/eyestest"
 )
 
 // --- mock PodManager ---
@@ -50,9 +51,10 @@ func makePods(names ...string) []corev1.Pod {
 
 func newTestEye(manager *mockPodManager) *Eye {
 	logger, _ := zap.NewDevelopment()
-	eye := &Eye{}
-	eye.Init(manager, logger)
-	return eye
+	return &Eye{
+		podManager: manager,
+		logger:     logger,
+	}
 }
 
 func testTarget() eyes.Target {
@@ -62,6 +64,22 @@ func testTarget() eyes.Target {
 		Namespace: "default",
 		Selector:  "app=api",
 	}
+}
+
+// --- contract tests ---
+
+func TestContract(t *testing.T) {
+	factory := func(deps eyes.Dependencies) eyes.Eye {
+		return &Eye{
+			podManager: deps.PodManager,
+			logger:     deps.Logger,
+		}
+	}
+
+	validConfig := &Config{PodKillCount: 1, Strategy: "random"}
+	invalidConfig := &Config{}
+
+	eyestest.RunContractTests(t, factory, validConfig, invalidConfig)
 }
 
 // --- tests ---
@@ -187,6 +205,15 @@ func TestEye_Observe_ActiveState(t *testing.T) {
 	metrics := eye.Observe()
 	if metrics.IsActive {
 		t.Error("new eye should not be active")
+	}
+}
+
+func TestEye_Observe_ReturnsEyeName(t *testing.T) {
+	eye := &Eye{}
+
+	metrics := eye.Observe()
+	if metrics.EyeName != "disintegration" {
+		t.Errorf("Observe().EyeName = %q, want %q", metrics.EyeName, "disintegration")
 	}
 }
 
