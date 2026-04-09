@@ -16,6 +16,10 @@ Orchestrator
  │  Resolves eye, validates config, resolves targets,
  │  calculates blast radius, manages experiment lifecycle
  │
+ ├──► Target Resolver (internal/k8s)
+ │    Fetches the K8s resource (Deployment, StatefulSet, Service, Pod),
+ │    extracts its pod selector, merges with --selector, returns pods
+ │
  ├──► Safety (pkg/safety)
  │    Blast radius calculation, min healthy check
  │
@@ -55,7 +59,7 @@ Packages under `internal/` contain the actual implementations. They cannot be im
 | `internal/cli` | Cobra commands: `unveil`, `dream`, `slumber`, `vision`, `version` |
 | `internal/orchestrator` | Experiment lifecycle: resolve, validate, execute, persist |
 | `internal/eyes/disintegration` | Pod termination eye implementation |
-| `internal/k8s` | Kubernetes client-go wrapper (`PodManager` implementation) |
+| `internal/k8s` | Kubernetes client-go wrapper (`PodManager`, `TargetResolver` implementations) |
 | `internal/state` | JSON file-based experiment persistence |
 | `internal/observability` | zap logger factory |
 | `internal/version` | Build-time version variables |
@@ -71,14 +75,17 @@ Dependencies flow inward — concrete implementations depend on abstractions, ne
 ```
 cmd/viy → internal/cli → internal/orchestrator → pkg/eyes (interface)
                                                 → pkg/safety
-                                                → internal/k8s
+                                                → internal/k8s (TargetResolver, PodManager)
                                                 → internal/state
+
+internal/k8s (Resolver)      → pkg/eyes (Target type)
+                             → pkg/errors
 
 internal/eyes/disintegration → pkg/eyes (implements interface)
                              → pkg/errors
 ```
 
-The orchestrator depends on `pkg/eyes.Eye` (the interface), not on any specific eye implementation. Eyes are discovered at runtime through the registry.
+The orchestrator depends on `pkg/eyes.Eye` (the interface) and `internal/k8s.TargetResolver` (the interface), not on any specific implementation. Eyes only see `PodManager` — they are not aware of target resolution. The `TargetResolver` handles fetching the K8s resource, extracting its selector, and resolving pods.
 
 ## Key Design Decisions
 

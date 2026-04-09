@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
-	corev1 "k8s.io/api/core/v1"
 
 	"github.com/oragazz0/viy/internal/k8s"
 	"github.com/oragazz0/viy/internal/state"
@@ -18,14 +17,16 @@ import (
 // Orchestrator wires target resolution, safety checks, and eye execution.
 type Orchestrator struct {
 	podManager k8s.PodManager
+	resolver   k8s.TargetResolver
 	store      *state.Store
 	logger     *zap.Logger
 }
 
 // NewOrchestrator creates an Orchestrator with all dependencies.
-func NewOrchestrator(podManager k8s.PodManager, store *state.Store, logger *zap.Logger) *Orchestrator {
+func NewOrchestrator(podManager k8s.PodManager, resolver k8s.TargetResolver, store *state.Store, logger *zap.Logger) *Orchestrator {
 	return &Orchestrator{
 		podManager: podManager,
+		resolver:   resolver,
 		store:      store,
 		logger:     logger,
 	}
@@ -64,12 +65,12 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	pods, err := o.podManager.GetPods(ctx, config.Target.Namespace, config.Target.Selector)
+	resolved, err := o.resolver.Resolve(ctx, config.Target)
 	if err != nil {
 		return fmt.Errorf("target resolution: %w", err)
 	}
 
-	maxAffected, err := safety.CalculateMaxAffected(len(pods), safety.BlastRadiusConfig{
+	maxAffected, err := safety.CalculateMaxAffected(len(resolved.Pods), safety.BlastRadiusConfig{
 		MaxPercentage:      config.BlastRadius,
 		MinHealthyReplicas: config.MinHealthyReplicas,
 	})
@@ -78,13 +79,15 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 	}
 
 	o.logger.Info("targets resolved",
-		zap.Int("total_pods", len(pods)),
+		zap.String("resource", resolved.ResourceKind+"/"+resolved.ResourceName),
+		zap.String("selector", resolved.Selector),
+		zap.Int("total_pods", len(resolved.Pods)),
 		zap.Int("max_affected", maxAffected),
 		zap.Int("blast_radius_pct", config.BlastRadius),
 	)
 
 	if config.DryRun {
-		return o.runDreamMode(pods, config, maxAffected)
+		return o.runDreamMode(resolved, config, maxAffected)
 	}
 
 	experiment := state.Experiment{
@@ -129,24 +132,32 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 	return nil
 }
 
-func (o *Orchestrator) runDreamMode(pods []corev1.Pod, config RunConfig, maxAffected int) error {
+func (o *Orchestrator) runDreamMode(resolved *k8s.ResolvedTarget, config RunConfig, maxAffected int) error {
 	fmt.Println()
 	fmt.Println("🔮 Dream Mode: Viy dreams of revelation...")
 	fmt.Println()
-	fmt.Printf("Targets that would be unveiled:\n")
+
+	fmt.Println("Target resolution:")
+	fmt.Printf("  Resource: %s/%s (%s) — found ✓\n",
+		resolved.ResourceKind, resolved.ResourceName, config.Target.Namespace)
+	fmt.Printf("  Selector: %s\n", resolved.Selector)
+	fmt.Printf("  Pods matched: %d\n", len(resolved.Pods))
+	fmt.Println()
 
 	limit := maxAffected
-	if limit > len(pods) {
-		limit = len(pods)
+	if limit > len(resolved.Pods) {
+		limit = len(resolved.Pods)
 	}
 
-	for _, pod := range pods[:limit] {
-		fmt.Printf("  • Pod: %s (%s/%s)\n", pod.Name, pod.Namespace, config.Target.Name)
+	fmt.Println("Targets that would be unveiled:")
+
+	for _, pod := range resolved.Pods[:limit] {
+		fmt.Printf("  • Pod: %s (%s)\n", pod.Name, pod.Namespace)
 	}
 
 	fmt.Println()
 	fmt.Printf("Estimated blast radius: %d%% (%d/%d pods)\n",
-		config.BlastRadius, limit, len(pods))
+		config.BlastRadius, limit, len(resolved.Pods))
 	fmt.Println("Safety checks: ✅ All passed")
 
 	return nil

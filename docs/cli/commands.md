@@ -32,16 +32,30 @@ viy unveil --eye <name> --target <kind/name> [flags]
 | `--duration` | No | `5m` | How long the experiment runs |
 | `--blast-radius` | No | `30%` | Maximum percentage of targets to affect |
 | `--config` | No | — | Eye-specific config as `key=value,key=value` |
+| `--selector` | No | — | Label selector to filter pods (e.g., `version=v2`) |
 | `--dream` | No | `false` | Dry-run mode (same as `viy dream`) |
 | `--min-healthy` | No | `1` | Minimum healthy replicas to preserve |
 
 ### Target Format
 
-The `--target` flag accepts `kind/name` format. The kind is extracted and the name is converted to a label selector `app=<name>`.
+The `--target` flag accepts `kind/name` format. Viy queries the Kubernetes API to fetch the actual resource and extract its pod selector. Supported kinds: `Pod`, `Deployment`, `StatefulSet`, `Service`.
 
 ```bash
---target deployment/nginx    # selects pods with label app=nginx
---target deployment/api      # selects pods with label app=api
+--target deployment/nginx      # resolves Deployment's .spec.selector → pods
+--target statefulset/database  # resolves StatefulSet's .spec.selector → pods
+--target service/api           # resolves Service's .spec.selector → pods
+--target pod/api-abc           # resolves the Pod's labels → matching pods
+```
+
+If the resource does not exist, Viy fails with a `target not found` error before any chaos is executed.
+
+### Combining `--target` and `--selector`
+
+The `--selector` flag adds extra label filtering on top of the resource's own selector. Both are merged:
+
+```bash
+# Only affect v2 pods within the api-server Deployment
+viy unveil --eye disintegration --target deployment/api-server --selector "version=v2"
 ```
 
 ### Examples
@@ -57,6 +71,10 @@ viy unveil --eye disintegration --target deployment/api \
 # With eye-specific config
 viy unveil --eye disintegration --target deployment/nginx \
   --config "podKillCount=3,interval=15s"
+
+# Filter by label selector
+viy unveil --eye disintegration --target deployment/api \
+  --selector "version=v2,tier=backend"
 
 # Tighter safety constraints
 viy unveil --eye disintegration --target deployment/nginx \
@@ -86,6 +104,7 @@ Same as `unveil` except `--duration` and `--dream` are not available (dream mode
 | `--eye` | Yes | — | Eye to open |
 | `--target` | Yes | — | Target resource |
 | `--namespace` | No | `default` | Kubernetes namespace |
+| `--selector` | No | — | Label selector to filter pods (e.g., `version=v2`) |
 | `--blast-radius` | No | `30%` | Maximum percentage of targets to affect |
 | `--config` | No | — | Eye-specific config |
 | `--min-healthy` | No | `1` | Minimum healthy replicas to preserve |
@@ -95,11 +114,17 @@ Same as `unveil` except `--duration` and `--dream` are not available (dream mode
 ```
 🔮 Dream Mode: Viy dreams of revelation...
 
-Targets that would be unveiled:
-  • Pod: nginx-abc123 (default/nginx)
-  • Pod: nginx-def456 (default/nginx)
+Target resolution:
+  Resource: deployment/nginx (default) — found ✓
+  Selector: app=nginx
+  Pods matched: 10
 
-Estimated blast radius: 30% (2/10 pods)
+Targets that would be unveiled:
+  • Pod: nginx-abc123 (default)
+  • Pod: nginx-def456 (default)
+  • Pod: nginx-ghi789 (default)
+
+Estimated blast radius: 30% (3/10 pods)
 Safety checks: ✅ All passed
 ```
 

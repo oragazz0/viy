@@ -29,8 +29,13 @@ Output:
 ```
 🔮 Dream Mode: Viy dreams of revelation...
 
+Target resolution:
+  Resource: deployment/nginx (default) — found ✓
+  Selector: app=nginx
+  Pods matched: 5
+
 Targets that would be unveiled:
-  • Pod: nginx-abc123 (default/nginx)
+  • Pod: nginx-abc123 (default)
 
 Estimated blast radius: 30% (1/5 pods)
 Safety checks: ✅ All passed
@@ -51,10 +56,11 @@ viy unveil \
 
 Viy will:
 
-1. Resolve pods matching `app=nginx` in the `default` namespace
-2. Validate blast radius (30% by default, min 1 healthy replica)
-3. Delete the selected pod
-4. Track the experiment in `~/.viy/state.json`
+1. Fetch the `nginx` Deployment from the Kubernetes API
+2. Extract its pod selector and resolve matching pods
+3. Validate blast radius (30% by default, min 1 healthy replica)
+4. Delete the selected pod
+5. Track the experiment in `~/.viy/state.json`
 
 ## 4. Check Experiment Status
 

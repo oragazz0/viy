@@ -50,7 +50,7 @@ type Target struct {
 }
 ```
 
-Targets are resolved from the `--target` flag. The format `kind/name` is parsed into a label selector `app=<name>` for pod discovery.
+Targets are resolved from the `--target` flag. The format `kind/name` causes Viy to query the Kubernetes API for the actual resource (Deployment, StatefulSet, Service, or Pod) and extract its pod selector. An optional `--selector` flag can add extra label filtering on top of the resource's selector.
 
 ### EyeConfig
 

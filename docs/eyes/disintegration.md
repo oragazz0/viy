@@ -73,15 +73,17 @@ viy unveil --eye disintegration --target deployment/nginx \
 
 ## Execution Flow
 
-1. Resolve pods matching the target's label selector (`app=<name>`)
-2. Calculate kill count (exact or percentage-based)
-3. Select pods using the chosen strategy
-4. For each selected pod:
+1. Resolve the target resource via the Kubernetes API (Deployment, StatefulSet, Service, or Pod)
+2. Extract the resource's pod selector, merge with any user-supplied `--selector`
+3. List matching pods
+4. Calculate kill count (exact or percentage-based)
+5. Select pods using the chosen strategy
+6. For each selected pod:
    - Log the pod name and namespace
    - Delete the pod with the configured grace period
    - Wait for `interval` before the next deletion (if configured)
    - Respect context cancellation between kills
-5. Record a truth: "Revealed N pods in namespace/target"
+7. Record a truth: "Revealed N pods in namespace/target"
 
 ## Metrics
 
@@ -99,6 +101,8 @@ During and after execution, `Observe()` returns:
 
 | Error | Cause | What to do |
 |---|---|---|
+| `target not found` | The specified resource does not exist in the cluster | Check the resource name, namespace, and kind |
+| `unsupported resource kind` | The target kind is not Pod, Deployment, StatefulSet, or Service | Use a supported kind |
 | `insufficient targets` | Requested kill count exceeds available pods | Lower `podKillCount` or check your target selector |
 | `invalid configuration` | Both `podKillCount` and `podKillPercentage` set | Use one or the other |
 | `blast radius would be exceeded` | Safety guard prevents killing that many pods | Increase `--blast-radius` or decrease kill count |
