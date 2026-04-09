@@ -11,18 +11,17 @@ Adding a new Eye requires four steps:
 3. Register via `init()`
 4. Wire up contract tests
 
-The existing Eye of Disintegration (`internal/eyes/disintegration/`) serves as the reference implementation.
+The Eye of Death (`pkg/eyes/death/`) serves as the reference implementation.
 
 ## Step 1: Create the Package
 
-Create a new directory under `internal/eyes/`:
+Create a new directory under `pkg/eyes/`:
 
 ```
-internal/eyes/youreyename/
+pkg/eyes/youreyename/
 ├── eye.go
 ├── config.go
-├── eye_test.go
-└── config_test.go
+└── eye_test.go
 ```
 
 ## Step 2: Define the Config
@@ -73,12 +72,15 @@ import (
 )
 
 // Register the eye at import time. The factory receives Dependencies
-// and stores what this eye needs.
+// and stores what this eye needs. Use only the subset of dependencies
+// your eye requires (interface segregation).
 func init() {
     eyes.Register("youreyename", func(deps eyes.Dependencies) eyes.Eye {
         return &Eye{
             podManager: deps.PodManager,
             logger:     deps.Logger,
+            // If your eye needs ephemeral container injection:
+            // ephemeralContainers: deps.EphemeralContainerManager,
         }
     })
 }
@@ -148,7 +150,7 @@ func (e *Eye) Observe() eyes.Metrics {
 
 The eye registers itself via `init()`, but the package must be imported somewhere for `init()` to execute. Add a blank import to the CLI layer that builds the config for your eye.
 
-In `internal/cli/unveil.go`, the disintegration eye is imported directly because the CLI builds its config. Follow the same pattern — add your import and a `buildYourEyeConfig()` function.
+The eye registers itself via `init()`, but the package must be imported somewhere for `init()` to execute. Add a blank import in the CLI layer that builds the config for your eye.
 
 ## Step 5: Wire Contract Tests
 
@@ -183,7 +185,7 @@ This validates: non-empty Name/Description, Validate accepts/rejects configs, Ob
 
 ## Step 6: Add CLI Config Parsing
 
-In `internal/cli/unveil.go`, add a config builder for your eye's `--config` key=value parsing, following the pattern of `buildDisintegrationConfig()`.
+In the CLI layer, add a config builder for your eye's `--config` key=value parsing, following the existing pattern.
 
 ## Checklist
 
@@ -202,5 +204,6 @@ In `internal/cli/unveil.go`, add a config builder for your eye's `--config` key=
 ## See Also
 
 - [Eyes Overview](../eyes/overview.md) — interface and registry details
-- [Eye of Disintegration](../eyes/disintegration.md) — reference implementation
+- [Eye of Death](../eyes/death.md) — reference implementation (resource exhaustion)
+- [Eye of Disintegration](../eyes/disintegration.md) — pod termination
 - [Architecture](design.md) — where eyes fit in the dependency graph
