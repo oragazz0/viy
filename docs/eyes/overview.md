@@ -96,7 +96,7 @@ type Dependencies struct {
 }
 ```
 
-Each eye uses only the subset it needs — `PodManager` for pod operations, `EphemeralContainerManager` for injecting sidecar processes (used by the Eye of Death). Extend this struct when new eye types require additional infrastructure capabilities (e.g., `NetworkManager` for the Eye of Charm).
+Each eye uses only the subset it needs — `PodManager` for pod operations, `EphemeralContainerManager` for injecting sidecar processes (used by the Eye of Death and Eye of Charm). Extend this struct when new eye types require additional infrastructure capabilities.
 
 ### Registration and Lookup
 
@@ -139,9 +139,11 @@ This validates: non-empty Name/Description, Validate accepts/rejects configs, Ob
 |---|---|---|
 | [Disintegration](disintegration.md) | Available | Pod termination — reveals auto-recovery and orchestration health |
 | [Death](death.md) | Available | Resource exhaustion — reveals resource limits, HPA scaling, and OOM killer behavior |
+| [Charm](charm.md) | Available | Network chaos — reveals network dependencies, timeouts, and circuit breaker behavior |
 
 ## See Also
 
 - [Eye of Disintegration](disintegration.md) — pod kill configuration and examples
 - [Eye of Death](death.md) — resource exhaustion configuration and examples
+- [Eye of Charm](charm.md) — network chaos configuration and examples
 - [Extending Viy](../architecture/extending.md) — how to write a new Eye
