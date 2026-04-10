@@ -205,5 +205,6 @@ In the CLI layer, add a config builder for your eye's `--config` key=value parsi
 
 - [Eyes Overview](../eyes/overview.md) — interface and registry details
 - [Eye of Death](../eyes/death.md) — reference implementation (resource exhaustion)
+- [Eye of Charm](../eyes/charm.md) — network chaos (ephemeral container + tc netem)
 - [Eye of Disintegration](../eyes/disintegration.md) — pod termination
 - [Architecture](design.md) — where eyes fit in the dependency graph
