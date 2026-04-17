@@ -47,7 +47,9 @@ Packages under `pkg/` define contracts and shared types. They are safe to import
 | Package | Purpose |
 |---|---|
 | `pkg/eyes` | `Eye` interface, `Target`, `Metrics`, `EyeConfig`, registry |
+| `pkg/eyes/charm` | Eye of Charm — network chaos via `tc netem` in ephemeral containers |
 | `pkg/eyes/death` | Eye of Death — resource exhaustion via stress-ng ephemeral containers |
+| `pkg/config` | Experiment YAML schema + per-eye decoder registry (parallel to `pkg/eyes` registry) |
 | `pkg/safety` | `CalculateMaxAffected` — blast radius logic |
 | `pkg/errors` | Sentinel errors and `DetailedError` with suggestions |
 
@@ -57,8 +59,8 @@ Packages under `internal/` contain the actual implementations. They cannot be im
 
 | Package | Purpose |
 |---|---|
-| `internal/cli` | Cobra commands: `unveil`, `dream`, `slumber`, `vision`, `version` |
-| `internal/orchestrator` | Experiment lifecycle: resolve, validate, execute, persist |
+| `internal/cli` | Cobra commands: `unveil`, `awaken`, `dream`, `slumber`, `vision`, `version` |
+| `internal/orchestrator` | Experiment lifecycle: `Run` (single-eye), `RunMulti` (multi-eye), contention detection |
 | `internal/eyes/disintegration` | Pod termination eye implementation |
 | `internal/k8s` | Kubernetes client-go wrapper (`PodManager`, `TargetResolver` implementations) |
 | `internal/state` | JSON file-based experiment persistence |
@@ -105,12 +107,67 @@ Eyes self-register via `init()` functions. This is simpler than plugin-based arc
 
 Keeping state local (`~/.viy/state.json`) means Viy works without cluster-side permissions beyond pod CRUD. CRD-based state is planned for v2.0+.
 
-### Why No YAML Config Loading?
+### Why a Parallel Decoder Registry for YAML?
 
-v0.1.0 prioritizes the CLI-first workflow. YAML configuration is planned for v0.3.0 to support reproducible experiment definitions.
+The eye factory registry (`pkg/eyes/registry.go`) maps eye names to factories that build `Eye` instances. When `viy awaken` loads YAML, it needs the *inverse* — a mapping from eye name to a function that turns raw `map[string]any` into the eye's typed `EyeConfig`. A parallel registry in `pkg/config/decoder.go` keeps the typed config owned by the eye package (each eye calls `config.RegisterDecoder` in its own `init()`), instead of forcing `pkg/config` to import every eye.
+
+## Multi-Eye Execution (`viy awaken`)
+
+`Orchestrator.RunMulti` (in `internal/orchestrator/multi.go`) is the concurrency cornerstone for v0.2.0 and the foundation for Apocalypse mode (v0.4).
+
+### Flow
+
+```
+awaken --file X.yaml
+  signal.NotifyContext(SIGINT, SIGTERM)          → rootCtx
+  config.Load + Experiment.Validate              → schema checks
+  for each eyeSpec: config.DecodeConfig          → typed EyeConfig + Validate
+  orchestrator.NewOrchestrator(...)
+  orch.RunMulti(rootCtx, MultiConfig)
+    prepareHandles: buildEye, Validate, resolveTarget, checkBlastRadius per eye
+    enforceContention: detect pod-UID overlap; warn or reject
+    if DryRun: print per-eye plan, return
+    persist Experiment{Eyes:[names...], Status:Unveiling}
+    runCtx = context.WithTimeout(rootCtx, spec.duration)
+    aggregator goroutine: tick every 10s, log per-eye Observe()
+    launch (continue OR fail-fast — see below)
+    persist final Experiment{Status:Revealed|Failed}
+```
+
+### Failure Policies
+
+**`continue`** uses `sync.WaitGroup` with disjoint error slots. Each goroutine writes into its own slot — no shared mutex. After `Wait`, errors are joined via `errors.Join`. Sibling failures do not cancel each other; only the wall-clock deadline and signal cancellation do.
+
+**`fail-fast`** uses `errgroup.WithContext`. The first non-nil return cancels the group context; every sibling Unveil observes cancellation and unwinds. `g.Wait()` returns the first error.
+
+Both policies share the same `runCtx = context.WithTimeout(rootCtx, spec.duration)` so the wall-clock cap and SIGINT always propagate.
+
+### `runOne` Lifecycle Guarantee
+
+Every launched eye gets `Close` called, even on panic, sibling cancellation, or wall-clock expiry. The deferred block uses a **fresh** `context.Background()` with a 30s timeout — never the group context — so cleanup survives cancellation. This is critical for Charm and Death, whose `Close` calls `ExecInContainer` to remove state inside the target pod.
+
+```go
+defer func() {
+    if r := recover(); r != nil {
+        err = fmt.Errorf("eye %s panicked: %v", handle.name, r)
+    }
+    closeCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    _ = handle.eye.Close(closeCtx)
+}()
+```
+
+### Contention Detection
+
+Built once during `enforceContention`, keyed on **`pod.UID`** (not `pod.Name`). Pod recreation mid-experiment produces a new UID, so a freshly-spawned replica landing in overlap territory won't generate a false positive on subsequent evaluations — and contention detection itself is a launch-time snapshot only.
+
+### Shared Helpers
+
+`Run` (single-eye) and `RunMulti` share `buildEye`, `resolveTarget`, and `checkBlastRadius` to avoid divergence.
 
 ## See Also
 
 - [State Persistence](state.md) — how experiments are tracked
 - [Extending Viy](extending.md) — adding new eyes
 - [Eyes Overview](../eyes/overview.md) — the Eye interface contract
+- [Experiment YAML](../configuration/experiment-yaml.md) — multi-eye input schema

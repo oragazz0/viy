@@ -20,12 +20,6 @@ import (
 	"github.com/oragazz0/viy/pkg/eyes"
 )
 
-var protectedNamespaces = map[string]bool{
-	"kube-system":     true,
-	"kube-public":     true,
-	"kube-node-lease": true,
-}
-
 func newUnveilCommand() *cobra.Command {
 	var (
 		eyeName     string

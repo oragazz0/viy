@@ -4,12 +4,13 @@
 
 ## Overview
 
-Adding a new Eye requires four steps:
+Adding a new Eye requires five steps:
 
 1. Define a config struct implementing `EyeConfig`
 2. Implement the `Eye` interface with dependency injection via factory
 3. Register via `init()`
-4. Wire up contract tests
+4. Register a YAML decoder so the eye works with `viy awaken`
+5. Wire up contract tests
 
 The Eye of Death (`pkg/eyes/death/`) serves as the reference implementation.
 
@@ -148,11 +149,49 @@ func (e *Eye) Observe() eyes.Metrics {
 
 ## Step 4: Wire the Import
 
-The eye registers itself via `init()`, but the package must be imported somewhere for `init()` to execute. Add a blank import to the CLI layer that builds the config for your eye.
+The eye registers itself via `init()`, but the package must be imported somewhere for `init()` to execute. Add a blank import to `internal/cli/eyes_register.go` so both the eye factory and its YAML decoder (Step 5) are loaded when the CLI starts.
 
-The eye registers itself via `init()`, but the package must be imported somewhere for `init()` to execute. Add a blank import in the CLI layer that builds the config for your eye.
+## Step 5: Register a YAML Decoder
 
-## Step 5: Wire Contract Tests
+For your eye to participate in `viy awaken`, register a decoder that builds your typed `Config` from a raw `map[string]any` (the YAML `config` block). Add `decode.go` to your package:
+
+```go
+package youreyename
+
+import (
+    "github.com/oragazz0/viy/pkg/config"
+    "github.com/oragazz0/viy/pkg/eyes"
+)
+
+func init() {
+    config.RegisterDecoder("youreyename", DecodeConfig)
+}
+
+// DecodeConfig builds a typed Config from a raw YAML map.
+// Validation is performed by the caller via eyes.EyeConfig.Validate.
+func DecodeConfig(raw map[string]any) (eyes.EyeConfig, error) {
+    someParameter, err := config.IntField(raw, "someParameter")
+    if err != nil {
+        return nil, err
+    }
+
+    anotherParam, err := config.DurationField(raw, "anotherParam")
+    if err != nil {
+        return nil, err
+    }
+
+    return &Config{
+        SomeParameter: someParameter,
+        AnotherParam:  anotherParam,
+    }, nil
+}
+```
+
+The `pkg/config` field helpers (`IntField`, `Int64Field`, `FloatField`, `StringField`, `DurationField`) tolerate missing keys (return zero + nil) and wrap type errors in `ErrInvalidConfiguration`. Unknown YAML keys are silently ignored, matching the CLI `--config` parser's behavior.
+
+The eye's `DecodeConfig` returns a **raw typed config**; `config.DecodeConfig` (the dispatcher) then calls `EyeConfig.Validate()` on the result, so you don't need to re-validate inside the decoder.
+
+## Step 6: Wire Contract Tests
 
 Add a contract test to `eye_test.go` to verify your eye satisfies the interface contract. The `pkg/eyes/eyestest` package provides a reusable test suite:
 
@@ -183,9 +222,9 @@ func TestContract(t *testing.T) {
 
 This validates: non-empty Name/Description, Validate accepts/rejects configs, Observe returns the correct EyeName, inactive by default, and Pause/Close behavior. Any future changes to the `Eye` interface contract will be caught here.
 
-## Step 6: Add CLI Config Parsing
+## Step 7: Add CLI Config Parsing
 
-In the CLI layer, add a config builder for your eye's `--config` key=value parsing, following the existing pattern.
+In the CLI layer, add a config builder for your eye's `--config` key=value parsing, following the existing pattern. This is what `viy unveil --eye youreyename --config "..."` uses; `viy awaken` uses the YAML decoder from Step 5.
 
 ## Checklist
 
@@ -193,11 +232,14 @@ In the CLI layer, add a config builder for your eye's `--config` key=value parsi
 - [ ] Eye struct implements all 7 methods of `eyes.Eye`
 - [ ] Factory receives `eyes.Dependencies` and stores needed deps
 - [ ] `init()` calls `eyes.Register()` with a unique name
+- [ ] `init()` also calls `config.RegisterDecoder()` so the eye works with `viy awaken`
+- [ ] Blank import added to `internal/cli/eyes_register.go`
 - [ ] `Observe()` returns `EyeName` matching `Name()`
 - [ ] `Unveil()` respects context cancellation
 - [ ] Metrics are updated atomically
 - [ ] Errors use sentinel types from `pkg/errors`
 - [ ] Contract tests pass via `eyestest.RunContractTests()`
+- [ ] Decoder tests cover: all fields, missing fields, invalid duration
 - [ ] Tests cover: success path, error paths, config validation, context cancellation
 - [ ] CLI config builder parses `--config` key=value pairs
 

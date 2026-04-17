@@ -4,9 +4,14 @@
 
 ## Overview
 
-Viy v0.1.0 is configured entirely through CLI flags. There is no YAML config file loading yet.
+Viy supports two configuration modes:
 
-Configuration flows through two layers:
+- **CLI flags + `--config` key=value** — used by `viy unveil` and `viy dream` for a single eye. This page documents that format.
+- **YAML experiment files** — used by `viy awaken` for multi-eye experiments. See [Experiment YAML](experiment-yaml.md) for the schema.
+
+Both paths end in the same typed eye config, so the behavior of a single eye is identical whichever mode you use.
+
+Configuration flows through three layers:
 
 1. **Global flags** — apply to all commands (log level, kubeconfig, output format)
 2. **Command flags** — specific to `unveil` and `dream` (eye, target, blast radius, etc.)
@@ -107,5 +112,6 @@ At least one of `cpuStress`, `memoryStress`, or `diskIOBytes` must be set. See [
 ## See Also
 
 - [CLI Commands](../cli/commands.md) — command-specific flags
+- [Experiment YAML](experiment-yaml.md) — YAML schema for `viy awaken`
 - [Eye of Disintegration](../eyes/disintegration.md) — config keys for the disintegration eye
 - [Eye of Death](../eyes/death.md) — config keys for the death eye
