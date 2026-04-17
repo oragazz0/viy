@@ -38,6 +38,7 @@ func newRootCommand() *cobra.Command {
 
 	root.AddCommand(
 		newUnveilCommand(),
+		newAwakenCommand(),
 		newDreamCommand(),
 		newSlumberCommand(),
 		newVisionCommand(),

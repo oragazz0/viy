@@ -16,20 +16,29 @@ import (
 
 // Orchestrator wires target resolution, safety checks, and eye execution.
 type Orchestrator struct {
-	podManager k8s.PodManager
-	resolver   k8s.TargetResolver
-	store      *state.Store
-	logger     *zap.Logger
+	podManager          k8s.PodManager
+	ephemeralContainers eyes.EphemeralContainerManager
+	resolver            k8s.TargetResolver
+	store               *state.Store
+	logger              *zap.Logger
 }
 
-// NewOrchestrator creates an Orchestrator with all dependencies.
+// NewOrchestrator creates an Orchestrator with the pod manager used as both
+// the pod-operations dependency and (when applicable) the ephemeral-container
+// dependency for eyes that need sidecar injection.
 func NewOrchestrator(podManager k8s.PodManager, resolver k8s.TargetResolver, store *state.Store, logger *zap.Logger) *Orchestrator {
-	return &Orchestrator{
+	orch := &Orchestrator{
 		podManager: podManager,
 		resolver:   resolver,
 		store:      store,
 		logger:     logger,
 	}
+
+	if eph, ok := podManager.(eyes.EphemeralContainerManager); ok {
+		orch.ephemeralContainers = eph
+	}
+
+	return orch
 }
 
 // RunConfig carries everything needed to start an experiment.
@@ -54,10 +63,7 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 		zap.Bool("dry_run", config.DryRun),
 	)
 
-	eye, err := eyes.Get(config.EyeName, eyes.Dependencies{
-		PodManager: o.podManager,
-		Logger:     o.logger,
-	})
+	eye, err := o.buildEye(config.EyeName)
 	if err != nil {
 		return err
 	}
@@ -66,15 +72,12 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 		return fmt.Errorf("validation failed: %w", err)
 	}
 
-	resolved, err := o.resolver.Resolve(ctx, config.Target)
+	resolved, err := o.resolveTarget(ctx, config.Target)
 	if err != nil {
-		return fmt.Errorf("target resolution: %w", err)
+		return err
 	}
 
-	maxAffected, err := safety.CalculateMaxAffected(len(resolved.Pods), safety.BlastRadiusConfig{
-		MaxPercentage:      config.BlastRadius,
-		MinHealthyReplicas: config.MinHealthyReplicas,
-	})
+	maxAffected, err := o.checkBlastRadius(len(resolved.Pods), config.BlastRadius, config.MinHealthyReplicas)
 	if err != nil {
 		return err
 	}
@@ -131,6 +134,35 @@ func (o *Orchestrator) Run(ctx context.Context, config RunConfig) error {
 	)
 
 	return nil
+}
+
+// buildEye constructs an eye from the registry with the orchestrator's
+// dependencies. Shared between Run and RunMulti.
+func (o *Orchestrator) buildEye(name string) (eyes.Eye, error) {
+	return eyes.Get(name, eyes.Dependencies{
+		PodManager:                o.podManager,
+		EphemeralContainerManager: o.ephemeralContainers,
+		Logger:                    o.logger,
+	})
+}
+
+// resolveTarget wraps the resolver with a thematic error message.
+func (o *Orchestrator) resolveTarget(ctx context.Context, target eyes.Target) (*k8s.ResolvedTarget, error) {
+	resolved, err := o.resolver.Resolve(ctx, target)
+	if err != nil {
+		return nil, fmt.Errorf("target resolution: %w", err)
+	}
+
+	return resolved, nil
+}
+
+// checkBlastRadius applies safety.CalculateMaxAffected with the given
+// percentage and minimum healthy replicas.
+func (o *Orchestrator) checkBlastRadius(totalPods, blastRadius, minHealthy int) (int, error) {
+	return safety.CalculateMaxAffected(totalPods, safety.BlastRadiusConfig{
+		MaxPercentage:      blastRadius,
+		MinHealthyReplicas: minHealthy,
+	})
 }
 
 func (o *Orchestrator) runDreamMode(resolved *k8s.ResolvedTarget, config RunConfig, maxAffected int) error {

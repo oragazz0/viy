@@ -1,0 +1,45 @@
+# Two eyes open in unison against the same deployment:
+#   * Disintegration  — kill one pod
+#   * Charm           — inject 200ms latency + 50ms jitter
+#
+# Overlap note: both eyes select the same pods. strictIsolation is
+# disabled, so Viy logs a contention warning and proceeds. Flip
+# strictIsolation to true to reject overlap before any eye opens.
+#
+# Contention is evaluated once at launch. Pods recreated mid-experiment
+# (e.g. after Disintegration kills one) are not re-checked for overlap
+# — a known limitation acknowledged in the v0.2.0 design.
+apiVersion: chaos.viy.io/v1alpha1
+kind: ChaosExperiment
+metadata:
+  name: disintegration-and-charm
+spec:
+  duration: 2m
+  failurePolicy: continue      # siblings keep running if one eye errors
+  staggerInterval: 5s          # second eye launches 5s after the first
+  strictIsolation: false
+  safety:
+    maxBlastRadius: 30
+    minHealthyReplicas: 1
+  eyes:
+    - name: disintegration
+      duration: 1m             # optional; must be <= spec.duration
+      target:
+        kind: deployment
+        name: api
+        namespace: default
+      config:
+        podKillCount: 1
+        interval: 30s
+        strategy: random
+        gracePeriod: 10s
+    - name: charm
+      target:
+        kind: deployment
+        name: api
+        namespace: default
+      config:
+        latency: 200ms
+        jitter: 50ms
+        duration: 2m
+        interface: eth0
