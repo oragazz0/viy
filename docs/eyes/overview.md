@@ -141,9 +141,15 @@ This validates: non-empty Name/Description, Validate accepts/rejects configs, Ob
 | [Death](death.md) | Available | Resource exhaustion — reveals resource limits, HPA scaling, and OOM killer behavior |
 | [Charm](charm.md) | Available | Network chaos — reveals network dependencies, timeouts, and circuit breaker behavior |
 
+## Running Eyes
+
+- **Single eye** — `viy unveil` opens one eye at a time with CLI flags. See [CLI Commands](../cli/commands.md#viy-unveil).
+- **Many eyes at once** — `viy awaken --file experiment.yaml` opens multiple eyes concurrently with shared context cancellation, aggregated metrics, and configurable failure policies. See [`viy awaken`](../cli/commands.md#viy-awaken) and [Experiment YAML](../configuration/experiment-yaml.md).
+
 ## See Also
 
 - [Eye of Disintegration](disintegration.md) — pod kill configuration and examples
 - [Eye of Death](death.md) — resource exhaustion configuration and examples
 - [Eye of Charm](charm.md) — network chaos configuration and examples
 - [Extending Viy](../architecture/extending.md) — how to write a new Eye
+- [Experiment YAML](../configuration/experiment-yaml.md) — multi-eye input schema

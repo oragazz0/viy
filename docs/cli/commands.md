@@ -95,6 +95,62 @@ viy unveil --eye death --target deployment/worker \
 
 ---
 
+## `viy awaken`
+
+Open **many** eyes at once — run a multi-eye experiment from a YAML file.
+
+```bash
+viy awaken --file experiment.yaml [--dream]
+```
+
+### Flags
+
+| Flag | Required | Default | Description |
+|---|---|---|---|
+| `--file` | Yes | — | Path to the experiment YAML |
+| `--dream` | No | `false` | Dry-run mode — preview without executing |
+
+### Behavior
+
+Viy loads the YAML, validates its structure, decodes each eye's config, resolves every target, checks blast radius per eye, then launches all eyes concurrently. Shared cancellation: `SIGINT` / `SIGTERM` and the wall-clock `spec.duration` propagate to every eye at once.
+
+Each eye's `Close` always runs on a **fresh 30s context** — graceful cleanup survives both parent cancellation and sibling failures (critical for Charm/Death, which run `ExecInContainer` during `Close`).
+
+### Failure Policies
+
+Set via `spec.failurePolicy`:
+
+| Policy | Behavior |
+|---|---|
+| `continue` *(default)* | Sibling eyes keep running when one errors. All errors are aggregated via `errors.Join` and returned when the experiment ends. |
+| `fail-fast` | First eye error cancels every sibling through a shared context. `Close` still runs for every launched eye. |
+
+Both policies share the same wall-clock deadline and signal propagation.
+
+### Contention Handling
+
+If two eyes target the same pod, Viy logs a warning by default. Set `spec.strictIsolation: true` to reject overlap before any eye opens. Detection is based on pod UID — pods recreated mid-experiment don't generate false-positive overlaps from name reuse.
+
+> **Known limitation:** Contention is evaluated once at launch. Pods spawned after the experiment starts are not re-checked.
+
+### Examples
+
+```bash
+# Dry-run — resolves targets, checks blast radius, prints plan per eye
+viy awaken --file experiment.yaml --dream
+
+# Live multi-eye experiment
+viy awaken --file examples/awaken/disintegration-and-charm.yaml
+```
+
+See [Experiment YAML](../configuration/experiment-yaml.md) for the full schema and [examples/awaken/disintegration-and-charm.yaml](../../examples/awaken/disintegration-and-charm.yaml) for a working sample.
+
+### Signal Handling
+
+`awaken` listens for `SIGINT` (Ctrl+C) and `SIGTERM`. Cancellation propagates to every in-flight eye at once, and `Close` runs for each one with its own fresh context.
+
+---
+
 ## `viy dream`
 
 Dry-run mode — preview what would happen without executing chaos.

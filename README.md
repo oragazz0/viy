@@ -36,8 +36,8 @@ weakness:
 | Eye | Chaos Type | What It Reveals |
 |-----|-----------|-----------------|
 | **Disintegration** *(v0.1)* | Pod deletion | Auto-recovery, health checks, single points of failure |
-| **Charm** *(v0.2)* | Network manipulation | Timeout gaps, circuit breaker failures, retry logic |
-| **Death** *(v0.2)* | CPU/Memory stress | Resource limits, HPA, noisy neighbor tolerance |
+| **Charm** *(v0.2)* | Network manipulation (`tc netem`) | Timeout gaps, circuit breaker failures, retry logic |
+| **Death** *(v0.2)* | CPU / memory / disk stress | Resource limits, HPA, noisy neighbor tolerance |
 | **Petrification** *(v0.4)* | Container freeze | Deadlocks, dependency timeouts |
 | **Sleep** *(v0.4)* | Latency injection | UX degradation, cache effectiveness |
 | **Wounding** *(v0.4)* | Error injection | Error handling gaps, flaky service tolerance |
@@ -154,7 +154,8 @@ viy slumber --all
 
 ```
 viy
-├── unveil    Start experiment (open one eye)
+├── unveil    Open one eye — single-eye experiment
+├── awaken    Open many eyes — multi-eye experiment from YAML
 ├── dream     Dry-run mode (dream without executing)
 ├── vision    List active/past experiments
 ├── slumber   Stop experiments (close eyes)
@@ -165,7 +166,7 @@ viy
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--eye` | *(required)* | Eye to open: `disintegration` |
+| `--eye` | *(required)* | Eye to open: `disintegration`, `charm`, or `death` |
 | `--target` | *(required)* | K8s resource, e.g. `deployment/nginx` |
 | `--namespace` | `default` | Kubernetes namespace |
 | `--duration` | `5m` | How long the revelation lasts |
@@ -174,23 +175,21 @@ viy
 | `--config` | | Eye config as `key=value,key=value` |
 | `--dream` | `false` | Run in dry-run mode |
 
-### Disintegration Config Keys
+See [docs/configuration/cli-flags.md](docs/configuration/cli-flags.md) for the full
+per-eye `--config` key reference.
 
-| Key | Example | Description |
-|-----|---------|-------------|
-| `podKillCount` | `3` | Fixed number of pods to kill |
-| `podKillPercentage` | `30` | Percentage of pods to kill |
-| `interval` | `60s` | Wait between kills |
-| `strategy` | `random` | `random` or `sequential` |
-| `gracePeriod` | `30s` | Grace period before termination |
+### `viy awaken`
+
+Open multiple eyes simultaneously from a YAML experiment file:
 
 ```bash
-viy unveil \
-  --eye disintegration \
-  --target deployment/api \
-  --config "podKillPercentage=30,interval=60s,strategy=random,gracePeriod=30s" \
-  --duration 10m
+viy awaken --file examples/awaken/disintegration-and-charm.yaml
+viy awaken --file experiment.yaml --dream   # dry-run
 ```
+
+See [docs/configuration/experiment-yaml.md](docs/configuration/experiment-yaml.md)
+for the schema and [docs/cli/commands.md](docs/cli/commands.md#viy-awaken) for
+failure policies, contention detection, and signal handling.
 
 ---
 
@@ -211,32 +210,34 @@ Viy reveals truths, but responsibly. The heavy eyelids are safety guards:
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                CLI Interface (Cobra)                     │
-│  viy unveil | dream | vision | slumber | version         │
-└─────────────────────┬───────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                   CLI Interface (Cobra)                       │
+│  viy unveil | awaken | dream | vision | slumber | version     │
+└─────────────────────┬────────────────────────────────────────┘
                       │
-┌─────────────────────▼───────────────────────────────────┐
-│           Core Orchestrator (Viy's Eye)                  │
-│  • Target Resolution  • Safety Checks  • Lifecycle Mgmt │
-└─────────┬────────────────────────────────────┬──────────┘
-          │                                    │
-┌─────────▼─────────┐              ┌──────────▼──────────┐
-│   Eye Registry    │              │  Observability      │
-│  • Discovery      │              │  • Structured JSON  │
-│  • Validation     │              │    Logging (zap)    │
-│  • Lifecycle      │              └─────────────────────┘
-└─────────┬─────────┘
-          │
-┌─────────▼──────────────────────────────────────────────┐
-│              Eyes (Chaos Modules)                        │
-├─────────────────────────────────────────────────────────┤
-│ Disintegration (v0.1)  │  Charm, Death, ... (planned)   │
-└────┬────────────────────────────────────────────────────┘
-     │
-┌────▼────────────────────────────────────────────────────┐
-│           Kubernetes API (client-go)                     │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────▼────────────────────────────────────────┐
+│               Core Orchestrator (Viy's Eye)                   │
+│  Run (single-eye)  │  RunMulti (multi-eye, errgroup/waitgroup)│
+│  Target Resolution │ Safety Checks │ Contention │ Lifecycle   │
+└──────┬───────────────────────────────────────┬───────────────┘
+       │                                       │
+┌──────▼─────────────┐                ┌────────▼─────────────┐
+│ Eye + Decoder      │                │  Observability       │
+│ Registries         │                │  • Structured JSON   │
+│ (pkg/eyes +        │                │    logging (zap)     │
+│  pkg/config)       │                └──────────────────────┘
+└──────┬─────────────┘
+       │
+┌──────▼───────────────────────────────────────────────────────┐
+│                   Eyes (Chaos Modules)                        │
+├───────────────────────────────────────────────────────────────┤
+│ Disintegration (pod kill) │ Charm (tc netem) │ Death (stress) │
+└──────┬────────────────────────────────────────────────────────┘
+       │
+┌──────▼───────────────────────────────────────────────────────┐
+│                  Kubernetes API (client-go)                   │
+│          + ephemeral containers (kubectl debug shape)         │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ### Package Layout
@@ -245,18 +246,23 @@ Viy reveals truths, but responsibly. The heavy eyelids are safety guards:
 viy/
 ├── cmd/viy/main.go                          Entry point
 ├── pkg/
-│   ├── cli/                                 Cobra commands
-│   ├── eyes/                                Eye interface + registry
-│   │   └── disintegration/                  Pod kill module
-│   ├── errors/                              Sentinel errors
-│   ├── k8s/                                 Kubernetes client wrapper
-│   ├── observability/                       Structured logging
-│   ├── orchestrator/                        Core engine
-│   ├── safety/                              Blast radius calculator
-│   └── version/                             Build info
+│   ├── eyes/                                Eye interface + factory registry
+│   │   ├── charm/                           Network chaos (tc netem)
+│   │   └── death/                           Resource exhaustion (stress-ng)
+│   ├── config/                              YAML schema + decoder registry
+│   ├── errors/                              Sentinel errors + suggestions
+│   └── safety/                              Blast radius calculator
 └── internal/
+    ├── cli/                                 Cobra commands
+    ├── orchestrator/                        Run + RunMulti lifecycle
+    ├── eyes/disintegration/                 Pod kill module
+    ├── k8s/                                 Kubernetes client wrapper
+    ├── observability/                       Structured logging
     └── state/                               Local state persistence
 ```
+
+See [docs/architecture/design.md](docs/architecture/design.md) for the full
+dependency diagram and concurrency model.
 
 ---
 
@@ -285,8 +291,8 @@ go test -v ./internal/eyes/disintegration/...
 ## Roadmap
 
 - [x] **v0.1.0** — Eye of Disintegration, CLI, dry-run, state persistence
-- [ ] **v0.2.0** — Eye of Charm (network), Eye of Death (resources), multi-eye, Prometheus
-- [ ] **v0.3.0** — TUI dashboard (`viy scry`), reports (`viy reveal`), YAML configs
+- [x] **v0.2.0** — Eye of Charm (network), Eye of Death (resources), `viy awaken` multi-eye execution, YAML experiments
+- [ ] **v0.3.0** — TUI dashboard (`viy scry`), reports (`viy reveal`), Prometheus metrics
 - [ ] **v0.4.0** — Apocalypse mode, remaining Eyes, OpenTelemetry
 - [ ] **v1.0.0** — Production hardening, Helm chart, docs, release
 
